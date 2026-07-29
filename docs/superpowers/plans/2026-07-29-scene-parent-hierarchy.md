@@ -30,7 +30,7 @@
 
 **Interfaces:**
 - Consumes: `WESceneObject.id: Int?`, `WESceneObject.parent: Int?`, and source array indices.
-- Produces: `SceneHierarchyRecord(id: Int?, parentID: Int?, sourceIndex: Int)`, `SceneHierarchyAttachment.parent(sourceIndex: Int, localZ: Double)`, `SceneHierarchyAttachment.root(localZ: Double, reason: SceneHierarchyFallbackReason?)`, and `SceneHierarchyResolver.resolve(_:) -> [SceneHierarchyAttachment]`.
+- Produces: `SceneHierarchyRecord(id: Int?, parentID: Int?, sourceIndex: Int)`, `SceneHierarchyAttachment.parent(parentRecordIndex: Int, localZ: Double)`, `SceneHierarchyAttachment.root(localZ: Double, reason: SceneHierarchyFallbackReason?)`, and `SceneHierarchyResolver.resolve(_:) -> [SceneHierarchyAttachment]`.
 
 - [ ] **Step 1: Write failing model and resolver tests**
 
@@ -43,7 +43,7 @@ let records = [
 ]
 expectEqual(
     SceneHierarchyResolver.resolve(records)[0],
-    .parent(sourceIndex: 1, localZ: -1),
+    .parent(parentRecordIndex: 1, localZ: -1),
     "child resolves to a later parent"
 )
 ```
@@ -71,7 +71,7 @@ struct SceneHierarchyRecord: Equatable {
 
 enum SceneHierarchyAttachment: Equatable {
     case root(localZ: Double, reason: SceneHierarchyFallbackReason?)
-    case parent(sourceIndex: Int, localZ: Double)
+    case parent(parentRecordIndex: Int, localZ: Double)
 }
 ```
 
