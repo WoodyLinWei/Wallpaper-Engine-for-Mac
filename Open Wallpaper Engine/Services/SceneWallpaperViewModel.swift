@@ -99,7 +99,7 @@ class SceneWallpaperViewModel: ObservableObject {
     private func buildSKScene(from scene: WEScene, wallpaperDir: URL) -> WESpriteScene {
         let projection = scene.general.orthogonalprojection ?? WEOrthogonalProjection(width: 1920, height: 1080)
         let skScene = WESpriteScene(size: CGSize(width: projection.width, height: projection.height))
-        skScene.scaleMode = .aspectFit
+        skScene.scaleMode = .aspectFill
 
         // Background color from clearcolor
         if let colorStr = scene.general.clearcolor {
