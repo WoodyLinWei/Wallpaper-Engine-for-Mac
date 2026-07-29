@@ -1,4 +1,5 @@
 import Foundation
+import Compression
 
 private var failures = 0
 
@@ -131,6 +132,142 @@ do {
 } catch {
     failures += 1
     print("FAIL: flexible scene decoding threw \(error)")
+}
+
+private func appendUInt32(_ value: UInt32, to data: inout Data) {
+    var littleEndian = value.littleEndian
+    withUnsafeBytes(of: &littleEndian) { data.append(contentsOf: $0) }
+}
+
+private func appendFloat(_ value: Float, to data: inout Data) {
+    appendUInt32(value.bitPattern, to: &data)
+}
+
+private func appendMagic(_ value: String, to data: inout Data) {
+    data.append(contentsOf: value.utf8)
+    data.append(0)
+}
+
+private func makeSyntheticAnimatedTexture() throws -> Data {
+    let rgba: [UInt8] = [
+        255, 0, 0, 255,
+        0, 255, 0, 255
+    ]
+    var compressed = [UInt8](repeating: 0, count: 128)
+    let compressedCount = rgba.withUnsafeBytes { source in
+        compressed.withUnsafeMutableBytes { destination in
+            compression_encode_buffer(
+                destination.bindMemory(to: UInt8.self).baseAddress!,
+                destination.count,
+                source.bindMemory(to: UInt8.self).baseAddress!,
+                source.count,
+                nil,
+                COMPRESSION_LZ4_RAW
+            )
+        }
+    }
+    guard compressedCount > 0 else {
+        throw NSError(domain: "SceneRuntimeTests", code: 1)
+    }
+
+    var data = Data()
+    appendMagic("TEXV0005", to: &data)
+    appendMagic("TEXI0001", to: &data)
+    appendUInt32(0, to: &data) // RGBA8888
+    appendUInt32(4, to: &data) // animated
+    appendUInt32(2, to: &data) // texture width
+    appendUInt32(1, to: &data) // texture height
+    appendUInt32(2, to: &data) // real width
+    appendUInt32(1, to: &data) // real height
+    appendUInt32(0, to: &data) // unknown
+
+    appendMagic("TEXB0003", to: &data)
+    appendUInt32(1, to: &data) // image count
+    appendUInt32(UInt32.max, to: &data) // raw pixels, no FreeImage format
+    appendUInt32(1, to: &data) // mipmap count
+    appendUInt32(2, to: &data)
+    appendUInt32(1, to: &data)
+    appendUInt32(1, to: &data) // LZ4 compression
+    appendUInt32(UInt32(rgba.count), to: &data)
+    appendUInt32(UInt32(compressedCount), to: &data)
+    data.append(contentsOf: compressed.prefix(compressedCount))
+
+    appendMagic("TEXS0003", to: &data)
+    appendUInt32(2, to: &data)
+    appendUInt32(1, to: &data) // frame width
+    appendUInt32(1, to: &data) // frame height
+
+    for x in [Float(0), Float(1)] {
+        appendUInt32(0, to: &data)
+        appendFloat(0.1, to: &data)
+        appendFloat(x, to: &data)
+        appendFloat(0, to: &data)
+        appendFloat(1, to: &data)
+        appendFloat(0, to: &data)
+        appendFloat(0, to: &data)
+        appendFloat(1, to: &data)
+    }
+    return data
+}
+
+do {
+    let textureData = try makeSyntheticAnimatedTexture()
+    let decoded = try TEXParser(data: textureData).decodeTexture()
+    expectEqual(decoded.metadata.format, 0, "TEX format is decoded")
+    expectEqual(decoded.metadata.width, 2, "TEX real width is decoded")
+    expectEqual(decoded.metadata.height, 1, "TEX real height is decoded")
+    expectEqual(decoded.metadata.textureWidth, 2, "TEX storage width is decoded")
+    expectEqual(decoded.metadata.textureHeight, 1, "TEX storage height is decoded")
+    expectEqual(decoded.rgbaData, Data([255, 0, 0, 255, 0, 255, 0, 255]), "LZ4 RGBA bytes decode")
+    expectEqual(decoded.frames.count, 2, "TEXS frame count is decoded")
+    expectEqual(decoded.frames[0].x, 0, "first TEXS frame X is decoded")
+    expectEqual(decoded.frames[1].x, 1, "second TEXS frame X is decoded")
+    expectEqual(decoded.frames[0].width, 1, "TEXS frame width is decoded")
+    expect(abs(decoded.frames[0].duration - 0.1) < 0.0001, "TEXS frame duration is decoded")
+
+    do {
+        _ = try TEXParser(data: Data(textureData.prefix(20))).decodeTexture()
+        expect(false, "truncated TEX data is rejected")
+    } catch {
+        expect(true, "truncated TEX data is rejected")
+    }
+} catch {
+    failures += 1
+    print("FAIL: TEX decoding threw \(error)")
+}
+
+if let wallpaperPath = ProcessInfo.processInfo.environment["WE_MAPLE_WALLPAPER"] {
+    do {
+        let wallpaperURL = URL(fileURLWithPath: wallpaperPath, isDirectory: true)
+        let projectData = try Data(contentsOf: wallpaperURL.appendingPathComponent("project.json"))
+        let project = try JSONSerialization.jsonObject(with: projectData) as? [String: Any]
+        expectEqual(
+            project?["title"] as? String,
+            "MapleStory: Henesys Hunting Ground I 冒险岛：射手训练场1",
+            "real fixture title matches the selected wallpaper"
+        )
+
+        let package = try PKGParser(url: wallpaperURL.appendingPathComponent("scene.pkg"))
+        expectEqual(package.fileList.count, 68, "real fixture package entry count")
+        expectEqual(
+            package.extractFile(named: "sounds/CavaBien.mp3")?.count,
+            1_280_000,
+            "real fixture audio entry is available"
+        )
+
+        guard let blueSnailData = package.extractFile(named: "materials/lwn.1.tex") else {
+            throw NSError(domain: "SceneRuntimeTests", code: 2)
+        }
+        let blueSnail = try TEXParser(data: blueSnailData).decodeTexture()
+        expectEqual(blueSnail.metadata.width, 88, "blue snail atlas width")
+        expectEqual(blueSnail.metadata.height, 68, "blue snail atlas height")
+        expectEqual(blueSnail.frames.count, 4, "blue snail animation frame count")
+        expectEqual(blueSnail.frames.first?.width, 44, "blue snail frame width")
+        expectEqual(blueSnail.frames.first?.height, 34, "blue snail frame height")
+    } catch {
+        failures += 1
+        print("FAIL: real MapleStory fixture validation threw \(error)")
+    }
 }
 
 if failures > 0 {
