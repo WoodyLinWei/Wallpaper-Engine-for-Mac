@@ -188,7 +188,8 @@ stored per wallpaper so other wallpapers can use `fill`.
 
 `SceneAudioController` will use AVFoundation to:
 
-- Load packaged MP3 data through a runtime-owned temporary file.
+- Load packaged MP3 data directly from the package without exporting user
+  assets to disk.
 - Loop indefinitely.
 - Start only when the scene becomes active.
 - Pause when the renderer pauses or the display sleeps.
