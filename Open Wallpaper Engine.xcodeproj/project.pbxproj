@@ -67,6 +67,7 @@
 		DD0000000000000000000007 /* SceneAudioController.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD0000000000000000000006 /* SceneAudioController.swift */; };
 		DD0000000000000000000009 /* MotionItemBehavior.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD0000000000000000000008 /* MotionItemBehavior.swift */; };
 		DE0000000000000000000002 /* SceneHierarchyResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE0000000000000000000001 /* SceneHierarchyResolver.swift */; };
+		DF0000000000000000000002 /* ScriptedOriginMotionBehavior.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF0000000000000000000001 /* ScriptedOriginMotionBehavior.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -143,6 +144,7 @@
 		DD0000000000000000000006 /* SceneAudioController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneAudioController.swift; sourceTree = "<group>"; };
 		DD0000000000000000000008 /* MotionItemBehavior.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotionItemBehavior.swift; sourceTree = "<group>"; };
 		DE0000000000000000000001 /* SceneHierarchyResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneHierarchyResolver.swift; sourceTree = "<group>"; };
+		DF0000000000000000000001 /* ScriptedOriginMotionBehavior.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptedOriginMotionBehavior.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -252,6 +254,7 @@
 			children = (
 				DD0000000000000000000001 /* MobBehavior.swift */,
 				DD0000000000000000000008 /* MotionItemBehavior.swift */,
+				DF0000000000000000000001 /* ScriptedOriginMotionBehavior.swift */,
 				DE0000000000000000000001 /* SceneHierarchyResolver.swift */,
 				DD0000000000000000000004 /* WESpriteScene.swift */,
 				DD0000000000000000000006 /* SceneAudioController.swift */,
@@ -499,6 +502,7 @@
 				DD0000000000000000000005 /* WESpriteScene.swift in Sources */,
 				DD0000000000000000000007 /* SceneAudioController.swift in Sources */,
 				DD0000000000000000000009 /* MotionItemBehavior.swift in Sources */,
+				DF0000000000000000000002 /* ScriptedOriginMotionBehavior.swift in Sources */,
 				DE0000000000000000000002 /* SceneHierarchyResolver.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

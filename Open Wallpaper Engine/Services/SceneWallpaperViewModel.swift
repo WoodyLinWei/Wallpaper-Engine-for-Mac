@@ -111,9 +111,20 @@ class SceneWallpaperViewModel: ObservableObject {
         var animatedLayerCount = 0
         var mobLayerCount = 0
         var motionItemLayerCount = 0
+        var scriptedOriginMotionLayerCount = 0
         var scrollLayerCount = 0
         var renderableNodes: [SKNode] = []
         var hierarchyRecords: [SceneHierarchyRecord] = []
+        let sceneScriptConstants = SceneScriptConstantsParser.parse(
+            scene.objects.flatMap { object in
+                [
+                    object.originScript,
+                    object.scaleScript,
+                    object.visibleScript,
+                    object.alphaScript
+                ].compactMap { $0 }
+            }
+        )
 
         for (index, obj) in scene.objects.enumerated() {
             guard obj.visible != false else { continue }
@@ -165,6 +176,22 @@ class SceneWallpaperViewModel: ObservableObject {
                         )
                         skScene.bindMotionItem(node: node, controller: controller)
                         motionItemLayerCount += 1
+                    } else if let configuration = ScriptedOriginMotionParser.parse(
+                        script,
+                        constants: sceneScriptConstants
+                    ) {
+                        let controller = ScriptedOriginMotionController(
+                            configuration: configuration,
+                            initialPosition: MotionItemPosition(
+                                x: node.position.x,
+                                y: node.position.y
+                            )
+                        )
+                        skScene.bindScriptedOriginMotion(
+                            node: node,
+                            controller: controller
+                        )
+                        scriptedOriginMotionLayerCount += 1
                     }
                 }
 
@@ -204,6 +231,7 @@ class SceneWallpaperViewModel: ObservableObject {
 
         Self.log(
             "Runtime bindings: mobs=\(mobLayerCount) motionItems=\(motionItemLayerCount) " +
+            "scriptedOrigins=\(scriptedOriginMotionLayerCount) " +
             "timedAnimations=\(animatedLayerCount) scrolls=\(scrollLayerCount)"
         )
         return skScene

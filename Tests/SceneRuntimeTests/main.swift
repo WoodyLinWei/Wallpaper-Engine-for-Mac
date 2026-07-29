@@ -29,6 +29,23 @@ private func expectEqual<T: Equatable>(
     expect(value == expected, "\(message) — expected \(expected), got \(value)", file: file, line: line)
 }
 
+private func expectNear(
+    _ actual: @autoclosure () -> Double,
+    _ expected: Double,
+    accuracy: Double = 0.000_001,
+    _ message: String,
+    file: StaticString = #filePath,
+    line: UInt = #line
+) {
+    let value = actual()
+    expect(
+        abs(value - expected) <= accuracy,
+        "\(message) — expected \(expected), got \(value)",
+        file: file,
+        line: line
+    )
+}
+
 let vector = "1 2 3".parseVector3()
 expectEqual(vector.0, 1, "test harness compiles production parsing code")
 expectEqual(vector.1, 2, "vector parser returns Y")
@@ -333,6 +350,66 @@ if let wallpaperPath = ProcessInfo.processInfo.environment["WE_HAPPYVILLE_WALLPA
     }
 }
 
+if let wallpaperPath = ProcessInfo.processInfo.environment["WE_TOY_TOWER_WALLPAPER"] {
+    do {
+        let wallpaperURL = URL(fileURLWithPath: wallpaperPath, isDirectory: true)
+        let projectData = try Data(
+            contentsOf: wallpaperURL.appendingPathComponent("project.json")
+        )
+        let project = try JSONSerialization.jsonObject(with: projectData)
+            as? [String: Any]
+        expectEqual(
+            project?["title"] as? String,
+            "MapleStory: Toy Tower 冒险岛：玩具塔",
+            "Toy Tower fixture title matches the selected wallpaper"
+        )
+
+        let package = try PKGParser(
+            url: wallpaperURL.appendingPathComponent("scene.pkg")
+        )
+        guard let targetScene = try package.extractJSON(
+            named: "scene.json",
+            as: WEScene.self
+        ) else {
+            throw NSError(domain: "SceneRuntimeTests", code: 5)
+        }
+        let allPropertyScripts = targetScene.objects.flatMap { object in
+            [
+                object.originScript,
+                object.scaleScript,
+                object.visibleScript,
+                object.alphaScript
+            ].compactMap { $0 }
+        }
+        let constants = SceneScriptConstantsParser.parse(allPropertyScripts)
+        expectEqual(constants["speed"], 1, "Toy Tower discovers its shared scene speed")
+
+        let configurations = targetScene.objects.compactMap { object in
+            object.originScript.flatMap {
+                ScriptedOriginMotionParser.parse($0, constants: constants)
+            }
+        }
+        let cloudLike = configurations.filter {
+            $0.horizontalStep > 0 && $0.verticalOscillation == nil
+        }
+        let airshipLike = configurations.filter {
+            $0.horizontalStep < 0 && $0.verticalOscillation != nil
+        }
+        expect(
+            cloudLike.count >= 6,
+            "Toy Tower discovers its independently moving cloud layers"
+        )
+        expectEqual(
+            airshipLike.count,
+            2,
+            "Toy Tower discovers both bobbing airships"
+        )
+    } catch {
+        failures += 1
+        print("FAIL: Toy Tower fixture validation threw \(error)")
+    }
+}
+
 let laterParentRecords = [
     SceneHierarchyRecord(id: 198, parentID: 170, sourceIndex: 0),
     SceneHierarchyRecord(id: 170, parentID: nil, sourceIndex: 1)
@@ -453,7 +530,11 @@ expectEqual(
     "Mob parser rejects empty animation lists"
 )
 
-private final class SequenceRandomSource: MobRandomSource, MotionItemRandomSource {
+private final class SequenceRandomSource:
+    MobRandomSource,
+    MotionItemRandomSource,
+    ScriptedOriginMotionRandomSource
+{
     private let values: [Double]
     private var index = 0
 
@@ -524,6 +605,169 @@ let wrappingSleigh = MotionItemController(
 let wrappedSleigh = wrappingSleigh.update(deltaTime: 1.0 / 30.0)
 expectEqual(wrappedSleigh.x, 2652.5, "left-moving MotionItem restarts beyond the right edge")
 expectEqual(wrappedSleigh.y, 660, "MotionItem randomizes its perpendicular reset position")
+
+let sharedConstants = SceneScriptConstantsParser.parse([
+    """
+    export function init(value) {
+        shared.speed = 1
+        return value
+    }
+    """
+])
+expectEqual(sharedConstants["speed"], 1, "scene script parser reads static shared speed")
+expectEqual(
+    SceneScriptConstantsParser.parse(["shared.speed = Math.random()"])["speed"],
+    nil,
+    "scene script parser does not execute expressions"
+)
+
+let toyTowerCloudScript =
+    """
+    export function update(value) {
+        value.x = value.x + shared.speed * 0.8
+        if (value.x > 2200) {
+            value.x = -300
+        }
+        return value
+    }
+    """
+
+if let cloud = ScriptedOriginMotionParser.parse(
+    toyTowerCloudScript,
+    constants: sharedConstants
+) {
+    expectNear(cloud.horizontalStep, 0.8, "cloud parser reads shared-speed horizontal step")
+    expectEqual(cloud.alternateHorizontalStep, nil, "cloud has no alternate horizontal step")
+    expectEqual(cloud.wrapBoundary, .greaterThan(2200), "cloud parser reads right wrap boundary")
+    expectEqual(cloud.restartX, -300, "cloud parser reads restart X")
+    expectEqual(cloud.verticalOscillation, nil, "cloud has no vertical oscillation")
+} else {
+    failures += 1
+    print("FAIL: scripted origin parser rejected the Toy Tower cloud")
+}
+
+let toyTowerAirshipScript =
+    """
+    var move = 0.4
+    var begin_y = 857
+    export function update(value) {
+        if (value.x > 1920) {
+            value.x = value.x - shared.speed * 0.2
+        } else {
+            value.x = value.x - shared.speed * 2.5
+        }
+        value.y = value.y - move
+        var r = 60 * move
+        r = r > 0 ? r : -r
+        if (begin_y - value.y > r || value.y - begin_y > r) {
+            move = -move
+        }
+        if (value.x < -20) {
+            value.x = 2090
+            begin_y = (Math.random() * (900 - 100 + 1)) + 100
+            value.y = begin_y
+        }
+        return value
+    }
+    """
+
+let airshipConfiguration = ScriptedOriginMotionParser.parse(
+    toyTowerAirshipScript,
+    constants: sharedConstants
+)
+if let airship = airshipConfiguration {
+    expectNear(airship.horizontalStep, -2.5, "airship parser reads main horizontal step")
+    expectNear(
+        airship.alternateHorizontalStep ?? 0,
+        -0.2,
+        "airship parser reads off-canvas horizontal step"
+    )
+    expectEqual(
+        airship.alternateWhenXGreaterThan,
+        1920,
+        "airship parser reads alternate-speed boundary"
+    )
+    expectEqual(airship.wrapBoundary, .lessThan(-20), "airship parser reads left wrap boundary")
+    expectEqual(airship.restartX, 2090, "airship parser reads restart X")
+    expectEqual(
+        airship.verticalOscillation,
+        ScriptedOriginVerticalOscillation(step: -0.4, amplitude: 24),
+        "airship parser reads vertical bobbing"
+    )
+    expectEqual(airship.randomYRange, 100...900, "airship parser reads random restart range")
+} else {
+    failures += 1
+    print("FAIL: scripted origin parser rejected the Toy Tower airship")
+}
+
+if let airshipConfiguration {
+    let movingAirship = ScriptedOriginMotionController(
+        configuration: airshipConfiguration,
+        initialPosition: MotionItemPosition(x: 1000, y: 857),
+        randomSource: SequenceRandomSource([0.5])
+    )
+    let firstAirshipStep = movingAirship.update(deltaTime: 1.0 / 30.0)
+    expectNear(firstAirshipStep.x, 997.5, "airship advances at the authored 30 Hz step")
+    expectNear(firstAirshipStep.y, 856.6, "airship begins its vertical bob")
+
+    let sameElapsedAtSixtyFPS = ScriptedOriginMotionController(
+        configuration: airshipConfiguration,
+        initialPosition: MotionItemPosition(x: 1000, y: 857),
+        randomSource: SequenceRandomSource([0.5])
+    )
+    _ = sameElapsedAtSixtyFPS.update(deltaTime: 1.0 / 60.0)
+    let secondHalfFrame = sameElapsedAtSixtyFPS.update(deltaTime: 1.0 / 60.0)
+    expectNear(secondHalfFrame.x, 997.5, "airship speed is independent of display FPS")
+    expectNear(secondHalfFrame.y, 856.6, "airship bobbing is independent of display FPS")
+
+    let offCanvasAirship = ScriptedOriginMotionController(
+        configuration: airshipConfiguration,
+        initialPosition: MotionItemPosition(x: 1930, y: 857),
+        randomSource: SequenceRandomSource([0.5])
+    )
+    let offCanvasStep = offCanvasAirship.update(deltaTime: 1.0 / 30.0)
+    expectNear(offCanvasStep.x, 1929.8, "airship uses its slower off-canvas approach")
+
+    let wrappingAirship = ScriptedOriginMotionController(
+        configuration: airshipConfiguration,
+        initialPosition: MotionItemPosition(x: -19, y: 857),
+        randomSource: SequenceRandomSource([0.5])
+    )
+    let resetAirship = wrappingAirship.update(deltaTime: 1.0 / 30.0)
+    expectNear(resetAirship.x, 2090, "airship restarts at its authored X")
+    expectNear(resetAirship.y, 500, "airship chooses a new height at restart")
+}
+
+expectEqual(
+    ScriptedOriginMotionParser.parse("return value", constants: sharedConstants),
+    nil,
+    "unsupported origin scripts remain inert"
+)
+
+if let cloudConfiguration = ScriptedOriginMotionParser.parse(
+    toyTowerCloudScript,
+    constants: sharedConstants
+) {
+    let scriptedScene = WESpriteScene(size: CGSize(width: 1920, height: 1080))
+    let cloudNode = SKSpriteNode()
+    cloudNode.position = CGPoint(x: 400, y: 245)
+    scriptedScene.addChild(cloudNode)
+    scriptedScene.bindScriptedOriginMotion(
+        node: cloudNode,
+        controller: ScriptedOriginMotionController(
+            configuration: cloudConfiguration,
+            initialPosition: MotionItemPosition(x: 400, y: 245)
+        )
+    )
+    scriptedScene.update(0)
+    scriptedScene.update(1.0 / 30.0)
+    expectNear(
+        cloudNode.position.x,
+        400.8,
+        accuracy: 0.000_1,
+        "SpriteKit binding applies generic origin motion"
+    )
+}
 
 let movementConfiguration = MobBehaviorConfiguration(
     lowerBound: 10,

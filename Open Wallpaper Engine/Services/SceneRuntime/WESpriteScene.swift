@@ -58,8 +58,19 @@ final class WESpriteScene: SKScene {
         }
     }
 
+    private final class ScriptedOriginMotionBinding {
+        weak var node: SKSpriteNode?
+        let controller: ScriptedOriginMotionController
+
+        init(node: SKSpriteNode, controller: ScriptedOriginMotionController) {
+            self.node = node
+            self.controller = controller
+        }
+    }
+
     private var mobBindings: [MobBinding] = []
     private var motionItemBindings: [MotionItemBinding] = []
+    private var scriptedOriginMotionBindings: [ScriptedOriginMotionBinding] = []
     private var timedAnimations: [TimedAnimationBinding] = []
     private var lastUpdateTime: TimeInterval?
 
@@ -167,6 +178,15 @@ final class WESpriteScene: SKScene {
         apply(controller.position, to: binding)
     }
 
+    func bindScriptedOriginMotion(
+        node: SKSpriteNode,
+        controller: ScriptedOriginMotionController
+    ) {
+        let binding = ScriptedOriginMotionBinding(node: node, controller: controller)
+        scriptedOriginMotionBindings.append(binding)
+        apply(controller.position, to: binding)
+    }
+
     func attach(nodes: [SKNode], records: [SceneHierarchyRecord]) {
         let attachments = SceneHierarchyResolver.resolve(records)
 
@@ -228,6 +248,13 @@ final class WESpriteScene: SKScene {
             return false
         }
 
+        scriptedOriginMotionBindings.removeAll { binding in
+            guard binding.node != nil else { return true }
+            let position = binding.controller.update(deltaTime: deltaTime)
+            apply(position, to: binding)
+            return false
+        }
+
         timedAnimations.removeAll { binding in
             guard let node = binding.node else { return true }
             binding.elapsed += deltaTime
@@ -255,6 +282,13 @@ final class WESpriteScene: SKScene {
     }
 
     private func apply(_ position: MotionItemPosition, to binding: MotionItemBinding) {
+        binding.node?.position = CGPoint(x: position.x, y: position.y)
+    }
+
+    private func apply(
+        _ position: MotionItemPosition,
+        to binding: ScriptedOriginMotionBinding
+    ) {
         binding.node?.position = CGPoint(x: position.x, y: position.y)
     }
 
