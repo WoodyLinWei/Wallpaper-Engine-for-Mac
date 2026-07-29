@@ -266,9 +266,10 @@ if let wallpaperPath = ProcessInfo.processInfo.environment["WE_MAPLE_WALLPAPER"]
         expectEqual(targetScrollEffects.count, 2, "real fixture discovers two cloud scroll layers")
         expect(
             targetScrollEffects.allSatisfy {
-                abs($0.speedX - 0.15000001) < 0.000001 && $0.speedY == 0
+                abs($0.speedX - (0.15000001 * 0.15000001)) < 0.000001 &&
+                $0.speedY == 0
             },
-            "real fixture preserves both cloud scroll speeds"
+            "real fixture applies Wallpaper Engine's squared cloud speed"
         )
 
         guard let blueSnailData = package.extractFile(named: "materials/lwn.1.tex") else {
@@ -471,6 +472,56 @@ expect(
     missingAudioController.playbackState.shouldAnimateScene,
     "missing audio leaves scene visuals active"
 )
+
+final class FakeSceneAudioPlayer: SceneAudioPlayerProtocol {
+    var numberOfLoops = 0
+    var enableRate = false
+    var volume: Float = 1
+    var rate: Float = 1
+    var isPlaying = false
+    var stopCount = 0
+
+    func prepareToPlay() -> Bool { true }
+
+    func play() -> Bool {
+        isPlaying = true
+        return true
+    }
+
+    func pause() {
+        isPlaying = false
+    }
+
+    func stop() {
+        isPlaying = false
+        stopCount += 1
+    }
+}
+
+var sharedAudioFactoryCalls = 0
+let sharedFakePlayer = FakeSceneAudioPlayer()
+let sharedAudioCoordinator = SceneAudioCoordinator { _ in
+    sharedAudioFactoryCalls += 1
+    return sharedFakePlayer
+}
+let firstScreenAudio = SceneAudioController(coordinator: sharedAudioCoordinator)
+let secondScreenAudio = SceneAudioController(coordinator: sharedAudioCoordinator)
+let sharedAudioData = Data([1, 2, 3])
+
+firstScreenAudio.load(sourceKey: "maple/CavaBien.mp3", data: sharedAudioData)
+secondScreenAudio.load(sourceKey: "maple/CavaBien.mp3", data: sharedAudioData)
+expectEqual(sharedAudioFactoryCalls, 1, "two screens share one audio player for the same wallpaper")
+expectEqual(sharedAudioCoordinator.sessionCount, 1, "same wallpaper has one shared audio session")
+expectEqual(
+    sharedAudioCoordinator.clientCount(for: "maple/CavaBien.mp3"),
+    2,
+    "shared audio session tracks both screens"
+)
+
+firstScreenAudio.stop()
+expectEqual(sharedFakePlayer.stopCount, 0, "releasing one screen keeps shared audio alive")
+secondScreenAudio.stop()
+expectEqual(sharedFakePlayer.stopCount, 1, "releasing the last screen stops shared audio")
 
 if failures > 0 {
     print("\n\(failures) test(s) failed")

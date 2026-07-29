@@ -183,7 +183,8 @@ class SceneWallpaperViewModel: ObservableObject {
             : soundPath
         let data = pkgParser?.extractFile(named: normalizedPath)
             ?? (try? Data(contentsOf: wallpaperDir.appending(path: normalizedPath)))
-        audioController.load(data: data)
+        let sourceKey = "\(wallpaperDir.standardizedFileURL.path)|\(normalizedPath)"
+        audioController.load(sourceKey: sourceKey, data: data)
         Self.log(
             "Scene audio '\(normalizedPath)': \(audioController.hasAudio ? "playing" : "unavailable")"
         )

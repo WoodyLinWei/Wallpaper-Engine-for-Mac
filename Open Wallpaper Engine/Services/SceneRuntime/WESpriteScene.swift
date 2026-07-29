@@ -72,11 +72,15 @@ final class WESpriteScene: SKScene {
 
         let (repeatX, repeatY) = (shaderValues.repeatValue ?? "1 1").parseVector2()
         return WEScrollConfiguration(
-            speedX: shaderValues.speedX ?? 0,
-            speedY: shaderValues.speedY ?? 0,
+            speedX: wallpaperEngineScrollSpeed(shaderValues.speedX ?? 0),
+            speedY: wallpaperEngineScrollSpeed(shaderValues.speedY ?? 0),
             repeatX: repeatX,
             repeatY: repeatY
         )
+    }
+
+    private static func wallpaperEngineScrollSpeed(_ speed: Double) -> Double {
+        speed.sign == .minus ? -(speed * speed) : speed * speed
     }
 
     static func makeScrollShader(configuration: WEScrollConfiguration) -> SKShader {

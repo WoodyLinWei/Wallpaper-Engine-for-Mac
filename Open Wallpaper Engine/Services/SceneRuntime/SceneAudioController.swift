@@ -8,6 +8,21 @@
 import AVFoundation
 import Foundation
 
+protocol SceneAudioPlayerProtocol: AnyObject {
+    var numberOfLoops: Int { get set }
+    var enableRate: Bool { get set }
+    var volume: Float { get set }
+    var rate: Float { get set }
+    var isPlaying: Bool { get }
+
+    func prepareToPlay() -> Bool
+    func play() -> Bool
+    func pause()
+    func stop()
+}
+
+extension AVAudioPlayer: SceneAudioPlayerProtocol {}
+
 struct SceneAudioPlaybackState: Equatable {
     var playRate: Float
     var volume: Float
@@ -30,8 +45,132 @@ struct SceneAudioPlaybackState: Equatable {
     }
 }
 
+final class SceneAudioCoordinator {
+    typealias PlayerFactory = (Data) throws -> any SceneAudioPlayerProtocol
+
+    static let shared = SceneAudioCoordinator()
+
+    private final class Session {
+        let player: any SceneAudioPlayerProtocol
+        var clientStates: [UUID: SceneAudioPlaybackState]
+
+        init(
+            player: any SceneAudioPlayerProtocol,
+            clientID: UUID,
+            state: SceneAudioPlaybackState
+        ) {
+            self.player = player
+            self.clientStates = [clientID: state]
+        }
+    }
+
+    private let playerFactory: PlayerFactory
+    private var sessions: [String: Session] = [:]
+
+    init(
+        playerFactory: @escaping PlayerFactory = {
+            try AVAudioPlayer(data: $0)
+        }
+    ) {
+        self.playerFactory = playerFactory
+    }
+
+    var sessionCount: Int {
+        sessions.count
+    }
+
+    func clientCount(for sourceKey: String) -> Int {
+        sessions[sourceKey]?.clientStates.count ?? 0
+    }
+
+    @discardableResult
+    func attach(
+        clientID: UUID,
+        sourceKey: String,
+        data: Data?,
+        state: SceneAudioPlaybackState
+    ) -> Bool {
+        if let session = sessions[sourceKey] {
+            session.clientStates[clientID] = state
+            applyPlaybackState(to: session)
+            return true
+        }
+
+        guard let data, !data.isEmpty else { return false }
+
+        do {
+            let player = try playerFactory(data)
+            player.numberOfLoops = -1
+            player.enableRate = true
+            _ = player.prepareToPlay()
+
+            let session = Session(
+                player: player,
+                clientID: clientID,
+                state: state
+            )
+            sessions[sourceKey] = session
+            applyPlaybackState(to: session)
+            return true
+        } catch {
+            NSLog("[SceneAudio] Failed to decode packaged audio: %@", "\(error)")
+            return false
+        }
+    }
+
+    func update(
+        clientID: UUID,
+        sourceKey: String,
+        state: SceneAudioPlaybackState
+    ) {
+        guard let session = sessions[sourceKey],
+              session.clientStates[clientID] != nil
+        else {
+            return
+        }
+
+        session.clientStates[clientID] = state
+        applyPlaybackState(to: session)
+    }
+
+    func detach(clientID: UUID, sourceKey: String) {
+        guard let session = sessions[sourceKey] else { return }
+        session.clientStates.removeValue(forKey: clientID)
+
+        if session.clientStates.isEmpty {
+            session.player.stop()
+            sessions.removeValue(forKey: sourceKey)
+        } else {
+            applyPlaybackState(to: session)
+        }
+    }
+
+    func contains(clientID: UUID, sourceKey: String) -> Bool {
+        sessions[sourceKey]?.clientStates[clientID] != nil
+    }
+
+    private func applyPlaybackState(to session: Session) {
+        let states = Array(session.clientStates.values)
+        let activeState = states.first(where: \.shouldPlayAudio)
+        let representativeState = activeState ?? states.first
+
+        session.player.volume = states.map(\.effectiveVolume).max() ?? 0
+        session.player.rate = representativeState?.effectivePlayerRate ?? 1
+
+        if activeState != nil {
+            if !session.player.isPlaying {
+                _ = session.player.play()
+            }
+        } else if session.player.isPlaying {
+            session.player.pause()
+        }
+    }
+}
+
 final class SceneAudioController {
-    private var player: AVAudioPlayer?
+    private let coordinator: SceneAudioCoordinator
+    private let clientID = UUID()
+    private var sourceKey: String?
 
     private(set) var playbackState = SceneAudioPlaybackState(
         playRate: 1,
@@ -39,54 +178,54 @@ final class SceneAudioController {
         isSleeping: false
     )
 
+    init(coordinator: SceneAudioCoordinator = .shared) {
+        self.coordinator = coordinator
+    }
+
     var hasAudio: Bool {
-        player != nil
+        guard let sourceKey else { return false }
+        return coordinator.contains(clientID: clientID, sourceKey: sourceKey)
     }
 
     func load(data: Data?) {
-        stop()
-        guard let data, !data.isEmpty else { return }
+        load(sourceKey: "client-\(clientID.uuidString)", data: data)
+    }
 
-        do {
-            let player = try AVAudioPlayer(data: data)
-            player.numberOfLoops = -1
-            player.enableRate = true
-            player.prepareToPlay()
-            self.player = player
-            applyPlaybackState()
-        } catch {
-            NSLog("[SceneAudio] Failed to decode packaged audio: %@", "\(error)")
+    func load(sourceKey: String, data: Data?) {
+        stop()
+        if coordinator.attach(
+            clientID: clientID,
+            sourceKey: sourceKey,
+            data: data,
+            state: playbackState
+        ) {
+            self.sourceKey = sourceKey
         }
     }
 
     func update(playRate: Float, volume: Float) {
         playbackState.playRate = playRate
         playbackState.volume = volume
-        applyPlaybackState()
+        updateSharedSession()
     }
 
     func setSleeping(_ isSleeping: Bool) {
         playbackState.isSleeping = isSleeping
-        applyPlaybackState()
+        updateSharedSession()
     }
 
     func stop() {
-        player?.stop()
-        player = nil
+        guard let sourceKey else { return }
+        coordinator.detach(clientID: clientID, sourceKey: sourceKey)
+        self.sourceKey = nil
     }
 
-    private func applyPlaybackState() {
-        guard let player else { return }
-
-        player.volume = playbackState.effectiveVolume
-        player.rate = playbackState.effectivePlayerRate
-
-        if playbackState.shouldPlayAudio {
-            if !player.isPlaying {
-                player.play()
-            }
-        } else if player.isPlaying {
-            player.pause()
-        }
+    private func updateSharedSession() {
+        guard let sourceKey else { return }
+        coordinator.update(
+            clientID: clientID,
+            sourceKey: sourceKey,
+            state: playbackState
+        )
     }
 }
