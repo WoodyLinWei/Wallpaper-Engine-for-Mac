@@ -25,6 +25,7 @@ class SceneWallpaperViewModel: ObservableObject {
 
     private var pkgParser: PKGParser?
     private var textureCache: [String: WEDecodedTexture] = [:]
+    private let audioController = SceneAudioController()
 
     init(wallpaper: WEWallpaper) {
         self.currentWallpaper = wallpaper
@@ -39,6 +40,7 @@ class SceneWallpaperViewModel: ObservableObject {
     }
 
     deinit {
+        audioController.stop()
         NotificationCenter.default.removeObserver(self)
         NSWorkspace.shared.notificationCenter.removeObserver(self)
     }
@@ -46,6 +48,7 @@ class SceneWallpaperViewModel: ObservableObject {
     // MARK: - Scene Loading
 
     func loadScene(from wallpaper: WEWallpaper) {
+        audioController.stop()
         textureCache.removeAll()
         let dir = wallpaper.wallpaperDirectory
         let sceneFile = wallpaper.project.file  // e.g. "scene.json" or "gifscene.json"
@@ -84,6 +87,7 @@ class SceneWallpaperViewModel: ObservableObject {
 
         Self.log("Scene loaded: \(scene.objects.count) objects from \(sceneFile)")
         let skScene = buildSKScene(from: scene, wallpaperDir: dir)
+        loadAudio(from: scene, wallpaperDir: dir)
         Self.log("SKScene built: \(skScene.children.count) children")
         DispatchQueue.main.async {
             self.skScene = skScene
@@ -106,6 +110,7 @@ class SceneWallpaperViewModel: ObservableObject {
         var hasImage = false
         var animatedLayerCount = 0
         var mobLayerCount = 0
+        var scrollLayerCount = 0
 
         for (index, obj) in scene.objects.enumerated() {
             guard obj.visible != false else { continue }
@@ -114,6 +119,10 @@ class SceneWallpaperViewModel: ObservableObject {
                let built = buildImageNode(obj, wallpaperDir: wallpaperDir) {
                 let node = built.node
                 node.zPosition = WESpriteScene.zPosition(forObjectIndex: index)
+                if let scroll = WESpriteScene.scrollConfiguration(for: obj.effects) {
+                    node.shader = WESpriteScene.makeScrollShader(configuration: scroll)
+                    scrollLayerCount += 1
+                }
                 skScene.addChild(node)
                 hasImage = true
 
@@ -156,9 +165,33 @@ class SceneWallpaperViewModel: ObservableObject {
         }
 
         Self.log(
-            "Runtime bindings: mobs=\(mobLayerCount) timedAnimations=\(animatedLayerCount)"
+            "Runtime bindings: mobs=\(mobLayerCount) timedAnimations=\(animatedLayerCount) scrolls=\(scrollLayerCount)"
         )
         return skScene
+    }
+
+    private func loadAudio(from scene: WEScene, wallpaperDir: URL) {
+        let soundPaths = scene.objects.flatMap { $0.sound ?? [] }
+        guard let soundPath = soundPaths.first(where: { !$0.isEmpty }) else {
+            Self.log("No packaged scene audio")
+            audioController.load(data: nil)
+            return
+        }
+
+        let normalizedPath = soundPath.hasPrefix("/")
+            ? String(soundPath.dropFirst())
+            : soundPath
+        let data = pkgParser?.extractFile(named: normalizedPath)
+            ?? (try? Data(contentsOf: wallpaperDir.appending(path: normalizedPath)))
+        audioController.load(data: data)
+        Self.log(
+            "Scene audio '\(normalizedPath)': \(audioController.hasAudio ? "playing" : "unavailable")"
+        )
+    }
+
+    func updatePlayback(playRate: Float, volume: Float) {
+        audioController.update(playRate: playRate, volume: volume)
+        skScene?.isPaused = !audioController.playbackState.shouldAnimateScene
     }
 
     private func loadPreviewImage(wallpaperDir: URL) -> NSImage? {
@@ -612,11 +645,13 @@ class SceneWallpaperViewModel: ObservableObject {
 
     @objc func systemWillSleep(_ notification: Notification) {
         print("[SceneVM] System is going to sleep")
+        audioController.setSleeping(true)
         skScene?.isPaused = true
     }
 
     @objc func systemDidWake(_ notification: Notification) {
         print("[SceneVM] System woke up")
-        skScene?.isPaused = false
+        audioController.setSleeping(false)
+        skScene?.isPaused = !audioController.playbackState.shouldAnimateScene
     }
 }

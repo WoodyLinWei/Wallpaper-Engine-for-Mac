@@ -7,6 +7,13 @@
 
 import SpriteKit
 
+struct WEScrollConfiguration: Equatable {
+    let speedX: Double
+    let speedY: Double
+    let repeatX: Double
+    let repeatY: Double
+}
+
 final class WESpriteScene: SKScene {
     private final class MobBinding {
         weak var node: SKSpriteNode?
@@ -51,6 +58,54 @@ final class WESpriteScene: SKScene {
 
     static func horizontalScale(baseScale: CGFloat, direction: Int) -> CGFloat {
         abs(baseScale) * (direction < 0 ? -1 : 1)
+    }
+
+    static func scrollConfiguration(for effects: [WEEffect]?) -> WEScrollConfiguration? {
+        guard let effect = effects?.first(where: {
+            $0.visible != false &&
+            $0.file?.lowercased().contains("effects/scroll/") == true
+        }),
+        let shaderValues = effect.passes?.first?.constantShaderValues
+        else {
+            return nil
+        }
+
+        let (repeatX, repeatY) = (shaderValues.repeatValue ?? "1 1").parseVector2()
+        return WEScrollConfiguration(
+            speedX: shaderValues.speedX ?? 0,
+            speedY: shaderValues.speedY ?? 0,
+            repeatX: repeatX,
+            repeatY: repeatY
+        )
+    }
+
+    static func makeScrollShader(configuration: WEScrollConfiguration) -> SKShader {
+        let source =
+            """
+            void main() {
+                vec2 repeatedUV = v_tex_coord * u_scrollRepeat;
+                vec2 scrolledUV = fract(repeatedUV + (u_scrollSpeed * u_time));
+                gl_FragColor = texture2D(u_texture, scrolledUV) * v_color_mix;
+            }
+            """
+        let shader = SKShader(source: source)
+        shader.uniforms = [
+            SKUniform(
+                name: "u_scrollSpeed",
+                vectorFloat2: vector_float2(
+                    Float(configuration.speedX),
+                    Float(configuration.speedY)
+                )
+            ),
+            SKUniform(
+                name: "u_scrollRepeat",
+                vectorFloat2: vector_float2(
+                    Float(configuration.repeatX),
+                    Float(configuration.repeatY)
+                )
+            )
+        ]
+        return shader
     }
 
     func bindMob(

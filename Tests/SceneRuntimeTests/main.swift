@@ -255,6 +255,22 @@ if let wallpaperPath = ProcessInfo.processInfo.environment["WE_MAPLE_WALLPAPER"]
             "real fixture audio entry is available"
         )
 
+        guard let targetScene = try package.extractJSON(named: "scene.json", as: WEScene.self) else {
+            throw NSError(domain: "SceneRuntimeTests", code: 3)
+        }
+        let soundPaths = targetScene.objects.flatMap { $0.sound ?? [] }
+        expectEqual(soundPaths, ["sounds/CavaBien.mp3"], "real fixture discovers one audio track")
+        let targetScrollEffects = targetScene.objects.compactMap {
+            WESpriteScene.scrollConfiguration(for: $0.effects)
+        }
+        expectEqual(targetScrollEffects.count, 2, "real fixture discovers two cloud scroll layers")
+        expect(
+            targetScrollEffects.allSatisfy {
+                abs($0.speedX - 0.15000001) < 0.000001 && $0.speedY == 0
+            },
+            "real fixture preserves both cloud scroll speeds"
+        )
+
         guard let blueSnailData = package.extractFile(named: "materials/lwn.1.tex") else {
             throw NSError(domain: "SceneRuntimeTests", code: 2)
         }
@@ -410,6 +426,50 @@ expectEqual(
     WESpriteScene.horizontalScale(baseScale: 2, direction: 1),
     2,
     "Mob direction preserves base scale magnitude"
+)
+
+let activeAudioState = SceneAudioPlaybackState(
+    playRate: 1,
+    volume: 0.6,
+    isSleeping: false
+)
+expect(activeAudioState.shouldPlayAudio, "active scene audio should play")
+expect(activeAudioState.shouldAnimateScene, "active scene visuals should animate")
+expectEqual(activeAudioState.effectivePlayerRate, 1, "scene audio uses the selected playback rate")
+expectEqual(activeAudioState.effectiveVolume, 0.6, "scene audio uses the selected volume")
+
+let mutedAudioState = SceneAudioPlaybackState(
+    playRate: 1,
+    volume: 0,
+    isSleeping: false
+)
+expect(mutedAudioState.shouldPlayAudio, "muting does not pause scene audio timing")
+expect(mutedAudioState.shouldAnimateScene, "muting leaves scene visuals active")
+expectEqual(mutedAudioState.effectiveVolume, 0, "muting sets scene audio volume to zero")
+
+let pausedAudioState = SceneAudioPlaybackState(
+    playRate: 0,
+    volume: 1,
+    isSleeping: false
+)
+expect(!pausedAudioState.shouldPlayAudio, "zero playback rate pauses scene audio")
+expect(!pausedAudioState.shouldAnimateScene, "zero playback rate pauses scene visuals")
+
+let sleepingAudioState = SceneAudioPlaybackState(
+    playRate: 1,
+    volume: 1,
+    isSleeping: true
+)
+expect(!sleepingAudioState.shouldPlayAudio, "display sleep pauses scene audio")
+expect(!sleepingAudioState.shouldAnimateScene, "display sleep pauses scene visuals")
+
+let missingAudioController = SceneAudioController()
+missingAudioController.load(data: nil)
+missingAudioController.update(playRate: 1, volume: 1)
+expect(!missingAudioController.hasAudio, "missing audio data does not create a player")
+expect(
+    missingAudioController.playbackState.shouldAnimateScene,
+    "missing audio leaves scene visuals active"
 )
 
 if failures > 0 {
