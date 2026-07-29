@@ -63,6 +63,7 @@
 		CC0000000000000000000009 /* WorkshopViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000000000000000000000A /* WorkshopViewModel.swift */; };
 		CC000000000000000000000B /* WorkshopView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000000000000000000000C /* WorkshopView.swift */; };
 		DD0000000000000000000002 /* MobBehavior.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD0000000000000000000001 /* MobBehavior.swift */; };
+		DD0000000000000000000005 /* WESpriteScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD0000000000000000000004 /* WESpriteScene.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -135,6 +136,7 @@
 		CC000000000000000000000A /* WorkshopViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkshopViewModel.swift; sourceTree = "<group>"; };
 		CC000000000000000000000C /* WorkshopView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkshopView.swift; sourceTree = "<group>"; };
 		DD0000000000000000000001 /* MobBehavior.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobBehavior.swift; sourceTree = "<group>"; };
+		DD0000000000000000000004 /* WESpriteScene.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WESpriteScene.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -243,6 +245,7 @@
 			isa = PBXGroup;
 			children = (
 				DD0000000000000000000001 /* MobBehavior.swift */,
+				DD0000000000000000000004 /* WESpriteScene.swift */,
 			);
 			path = SceneRuntime;
 			sourceTree = "<group>";
@@ -484,6 +487,7 @@
 				CC0000000000000000000009 /* WorkshopViewModel.swift in Sources */,
 				CC000000000000000000000B /* WorkshopView.swift in Sources */,
 				DD0000000000000000000002 /* MobBehavior.swift in Sources */,
+				DD0000000000000000000005 /* WESpriteScene.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -385,6 +385,33 @@ expect(
     "random Mob initialization remains inside range"
 )
 
+let topLeftFrame = WETextureFrame(
+    imageIndex: 0,
+    duration: 0.1,
+    x: 0,
+    y: 0,
+    width: 44,
+    height: 34
+)
+let normalizedTopLeft = topLeftFrame.normalizedRect(textureWidth: 88, textureHeight: 68)
+expectEqual(normalizedTopLeft.origin.x, 0, "top-left TEX frame maps to left texture edge")
+expectEqual(normalizedTopLeft.origin.y, 0.5, "top-left TEX frame flips Y for SpriteKit")
+expectEqual(normalizedTopLeft.width, 0.5, "TEX frame width is normalized")
+expectEqual(normalizedTopLeft.height, 0.5, "TEX frame height is normalized")
+
+expectEqual(WESpriteScene.zPosition(forObjectIndex: 0), 0, "first scene object gets base Z")
+expectEqual(WESpriteScene.zPosition(forObjectIndex: 57), 57, "scene order maps to increasing Z")
+expectEqual(
+    WESpriteScene.horizontalScale(baseScale: 1, direction: -1),
+    -1,
+    "Mob direction flips a sprite horizontally"
+)
+expectEqual(
+    WESpriteScene.horizontalScale(baseScale: 2, direction: 1),
+    2,
+    "Mob direction preserves base scale magnitude"
+)
+
 if failures > 0 {
     print("\n\(failures) test(s) failed")
     exit(1)
