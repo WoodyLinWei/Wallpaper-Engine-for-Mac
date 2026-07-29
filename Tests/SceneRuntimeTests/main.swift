@@ -1,5 +1,6 @@
 import Foundation
 import Compression
+import SpriteKit
 
 private var failures = 0
 
@@ -597,6 +598,65 @@ expectEqual(
     WESpriteScene.horizontalScale(baseScale: 2, direction: 1),
     2,
     "Mob direction preserves base scale magnitude"
+)
+
+private func accumulatedZPosition(of node: SKNode) -> CGFloat {
+    var result = node.zPosition
+    var currentParent = node.parent
+    while let parent = currentParent {
+        result += parent.zPosition
+        currentParent = parent.parent
+    }
+    return result
+}
+
+let hierarchyScene = WESpriteScene(size: CGSize(width: 2580, height: 1080))
+let hierarchyParent = SKNode()
+let hierarchyChild = SKNode()
+let hierarchyGrandchild = SKNode()
+hierarchyChild.position = CGPoint(x: 0, y: 193)
+hierarchyGrandchild.position = CGPoint(x: -62, y: 70)
+hierarchyScene.attach(
+    nodes: [hierarchyParent, hierarchyChild, hierarchyGrandchild],
+    records: nestedRecords
+)
+expect(hierarchyParent.parent === hierarchyScene, "hierarchy root attaches to the scene")
+expect(hierarchyChild.parent === hierarchyParent, "child attaches to its authored parent")
+expect(
+    hierarchyGrandchild.parent === hierarchyChild,
+    "grandchild attaches to its authored parent"
+)
+expectEqual(hierarchyChild.position, CGPoint(x: 0, y: 193), "child keeps authored local origin")
+expectEqual(
+    hierarchyGrandchild.position,
+    CGPoint(x: -62, y: 70),
+    "grandchild keeps authored local origin"
+)
+expectEqual(
+    accumulatedZPosition(of: hierarchyParent),
+    10,
+    "root accumulated Z matches source index"
+)
+expectEqual(
+    accumulatedZPosition(of: hierarchyChild),
+    15,
+    "child accumulated Z matches source index"
+)
+expectEqual(
+    accumulatedZPosition(of: hierarchyGrandchild),
+    19,
+    "grandchild accumulated Z matches source index"
+)
+
+let missingParentScene = WESpriteScene(size: CGSize(width: 100, height: 100))
+let missingParentNode = SKNode()
+missingParentScene.attach(
+    nodes: [missingParentNode],
+    records: [SceneHierarchyRecord(id: 9, parentID: 99, sourceIndex: 4)]
+)
+expect(
+    missingParentNode.parent === missingParentScene,
+    "node with a missing parent remains visible at scene root"
 )
 
 let activeAudioState = SceneAudioPlaybackState(

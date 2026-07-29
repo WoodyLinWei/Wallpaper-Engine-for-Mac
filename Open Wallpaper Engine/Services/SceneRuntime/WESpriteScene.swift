@@ -167,6 +167,46 @@ final class WESpriteScene: SKScene {
         apply(controller.position, to: binding)
     }
 
+    func attach(nodes: [SKNode], records: [SceneHierarchyRecord]) {
+        let attachments = SceneHierarchyResolver.resolve(records)
+
+        for index in nodes.indices {
+            guard attachments.indices.contains(index) else {
+                nodes[index].zPosition = CGFloat(index)
+                addChild(nodes[index])
+                NSLog("[WESpriteScene] Missing hierarchy record for renderable node %d", index)
+                continue
+            }
+
+            switch attachments[index] {
+            case .root(let localZ, let reason):
+                nodes[index].zPosition = CGFloat(localZ)
+                addChild(nodes[index])
+                if let reason {
+                    NSLog(
+                        "[WESpriteScene] Hierarchy fallback for source index %d: %@",
+                        records[index].sourceIndex,
+                        Self.fallbackDescription(reason)
+                    )
+                }
+
+            case .parent(let parentRecordIndex, let localZ):
+                guard nodes.indices.contains(parentRecordIndex) else {
+                    nodes[index].zPosition = CGFloat(records[index].sourceIndex)
+                    addChild(nodes[index])
+                    NSLog(
+                        "[WESpriteScene] Invalid parent record index %d for source index %d",
+                        parentRecordIndex,
+                        records[index].sourceIndex
+                    )
+                    continue
+                }
+                nodes[index].zPosition = CGFloat(localZ)
+                nodes[parentRecordIndex].addChild(nodes[index])
+            }
+        }
+    }
+
     override func update(_ currentTime: TimeInterval) {
         defer { lastUpdateTime = currentTime }
         guard let lastUpdateTime else { return }
@@ -216,5 +256,18 @@ final class WESpriteScene: SKScene {
 
     private func apply(_ position: MotionItemPosition, to binding: MotionItemBinding) {
         binding.node?.position = CGPoint(x: position.x, y: position.y)
+    }
+
+    private static func fallbackDescription(
+        _ reason: SceneHierarchyFallbackReason
+    ) -> String {
+        switch reason {
+        case .missingParent(let id):
+            return "missing parent \(id)"
+        case .duplicateID(let id):
+            return "duplicate object ID \(id)"
+        case .cycle:
+            return "parent cycle"
+        }
     }
 }

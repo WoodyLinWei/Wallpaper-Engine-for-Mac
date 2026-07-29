@@ -112,6 +112,8 @@ class SceneWallpaperViewModel: ObservableObject {
         var mobLayerCount = 0
         var motionItemLayerCount = 0
         var scrollLayerCount = 0
+        var renderableNodes: [SKNode] = []
+        var hierarchyRecords: [SceneHierarchyRecord] = []
 
         for (index, obj) in scene.objects.enumerated() {
             guard obj.visible != false else { continue }
@@ -119,12 +121,18 @@ class SceneWallpaperViewModel: ObservableObject {
             if obj.image != nil,
                let built = buildImageNode(obj, wallpaperDir: wallpaperDir) {
                 let node = built.node
-                node.zPosition = WESpriteScene.zPosition(forObjectIndex: index)
                 if let scroll = WESpriteScene.scrollConfiguration(for: obj.effects) {
                     node.shader = WESpriteScene.makeScrollShader(configuration: scroll)
                     scrollLayerCount += 1
                 }
-                skScene.addChild(node)
+                renderableNodes.append(node)
+                hierarchyRecords.append(
+                    SceneHierarchyRecord(
+                        id: obj.id,
+                        parentID: obj.parent,
+                        sourceIndex: index
+                    )
+                )
                 hasImage = true
 
                 var mobControlsFrames = false
@@ -170,10 +178,18 @@ class SceneWallpaperViewModel: ObservableObject {
                 }
             } else if obj.particle != nil,
                       let node = buildParticleNode(obj, wallpaperDir: wallpaperDir, sceneSize: skScene.size) {
-                node.zPosition = WESpriteScene.zPosition(forObjectIndex: index)
-                skScene.addChild(node)
+                renderableNodes.append(node)
+                hierarchyRecords.append(
+                    SceneHierarchyRecord(
+                        id: obj.id,
+                        parentID: obj.parent,
+                        sourceIndex: index
+                    )
+                )
             }
         }
+
+        skScene.attach(nodes: renderableNodes, records: hierarchyRecords)
 
         // Fallback: use preview image
         if !hasImage {
