@@ -60,6 +60,7 @@ do {
         """
         {
           "id": 2,
+          "parent": 1,
           "name": "scripted",
           "origin": {
             "value": "1000 673 0",
@@ -81,6 +82,7 @@ do {
         """
     )
     expectEqual(scripted.origin, "1000 673 0", "scripted origin fallback is preserved")
+    expectEqual(scripted.parent, 1, "scene object parent is decoded")
     expect(
         scripted.originScript?.contains("new shared.Mob") == true,
         "scripted origin source is preserved"
@@ -94,6 +96,9 @@ do {
     expectEqual(scripted.visibleScript, "return show", "scripted visibility source is preserved")
     expectEqual(scripted.alpha, 0.5, "scripted alpha fallback is preserved")
     expectEqual(scripted.alphaScript, "return value", "scripted alpha source is preserved")
+    let scriptedRoundTrip = try JSONEncoder().encode(scripted)
+    let scriptedJSON = try JSONSerialization.jsonObject(with: scriptedRoundTrip) as? [String: Any]
+    expectEqual(scriptedJSON?["parent"] as? Int, 1, "scene object parent is re-encoded")
 
     let sound = try decodeObject(
         """
@@ -315,11 +320,85 @@ if let wallpaperPath = ProcessInfo.processInfo.environment["WE_HAPPYVILLE_WALLPA
             },
             "Happyville sleigh layers preserve their authored motion settings"
         )
+        let house3 = targetScene.objects.first { $0.id == 170 }
+        let house3Roof = targetScene.objects.first { $0.id == 166 }
+        let house3Side = targetScene.objects.first { $0.id == 198 }
+        expectEqual(house3?.parent, nil, "Happyville house 3 is a hierarchy root")
+        expectEqual(house3Roof?.parent, 170, "Happyville house 3 roof references its parent")
+        expectEqual(house3Side?.parent, 170, "Happyville house 3 side references its parent")
     } catch {
         failures += 1
         print("FAIL: Happyville fixture validation threw \(error)")
     }
 }
+
+let laterParentRecords = [
+    SceneHierarchyRecord(id: 198, parentID: 170, sourceIndex: 0),
+    SceneHierarchyRecord(id: 170, parentID: nil, sourceIndex: 1)
+]
+expectEqual(
+    SceneHierarchyResolver.resolve(laterParentRecords),
+    [
+        .parent(parentRecordIndex: 1, localZ: -1),
+        .root(localZ: 1, reason: nil)
+    ],
+    "child resolves to a parent that appears later"
+)
+
+let nestedRecords = [
+    SceneHierarchyRecord(id: 10, parentID: nil, sourceIndex: 10),
+    SceneHierarchyRecord(id: 11, parentID: 10, sourceIndex: 15),
+    SceneHierarchyRecord(id: 12, parentID: 11, sourceIndex: 19)
+]
+expectEqual(
+    SceneHierarchyResolver.resolve(nestedRecords),
+    [
+        .root(localZ: 10, reason: nil),
+        .parent(parentRecordIndex: 0, localZ: 5),
+        .parent(parentRecordIndex: 1, localZ: 4)
+    ],
+    "nested hierarchy preserves accumulated scene-wide Z order"
+)
+
+expectEqual(
+    SceneHierarchyResolver.resolve([
+        SceneHierarchyRecord(id: 1, parentID: 99, sourceIndex: 3)
+    ]),
+    [.root(localZ: 3, reason: .missingParent(99))],
+    "missing parent falls back to the scene root"
+)
+
+expectEqual(
+    SceneHierarchyResolver.resolve([
+        SceneHierarchyRecord(id: 1, parentID: nil, sourceIndex: 0),
+        SceneHierarchyRecord(id: 1, parentID: nil, sourceIndex: 1)
+    ]),
+    [
+        .root(localZ: 0, reason: nil),
+        .root(localZ: 1, reason: .duplicateID(1))
+    ],
+    "duplicate object ID keeps the first renderable parent target"
+)
+
+expectEqual(
+    SceneHierarchyResolver.resolve([
+        SceneHierarchyRecord(id: 1, parentID: 1, sourceIndex: 0)
+    ]),
+    [.root(localZ: 0, reason: .cycle)],
+    "self-parenting falls back to the scene root"
+)
+
+expectEqual(
+    SceneHierarchyResolver.resolve([
+        SceneHierarchyRecord(id: 1, parentID: 2, sourceIndex: 0),
+        SceneHierarchyRecord(id: 2, parentID: 1, sourceIndex: 1)
+    ]),
+    [
+        .root(localZ: 0, reason: .cycle),
+        .root(localZ: 1, reason: .cycle)
+    ],
+    "multi-node parent cycle falls back safely"
+)
 
 let snailScript =
     """

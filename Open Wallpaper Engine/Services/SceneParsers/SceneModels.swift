@@ -98,6 +98,7 @@ struct WEScriptedValue<Value: Codable>: Codable {
 struct WESceneObject: Codable {
     // Common
     var id: Int?
+    var parent: Int?
     var name: String?
     private var originValue: WEScriptedValue<String>?
     private var scaleValue: WEScriptedValue<String>?
@@ -135,7 +136,7 @@ struct WESceneObject: Codable {
     var alphaScript: String? { alphaValue?.script }
 
     enum CodingKeys: String, CodingKey {
-        case id, name, origin, scale, angles, visible
+        case id, parent, name, origin, scale, angles, visible
         case image, alpha, brightness, color, colorBlendMode, size, alignment
         case solid, copybackground, parallaxDepth, perspective
         case particle, instanceoverride
@@ -146,6 +147,7 @@ struct WESceneObject: Codable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         // Fields that are always simple types
         id = try? c.decodeIfPresent(Int.self, forKey: .id)
+        parent = try? c.decodeIfPresent(Int.self, forKey: .parent)
         name = try? c.decodeIfPresent(String.self, forKey: .name)
         image = try? c.decodeIfPresent(String.self, forKey: .image)
         particle = try? c.decodeIfPresent(String.self, forKey: .particle)
@@ -173,6 +175,7 @@ struct WESceneObject: Codable {
     func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encodeIfPresent(id, forKey: .id)
+        try c.encodeIfPresent(parent, forKey: .parent)
         try c.encodeIfPresent(name, forKey: .name)
         try c.encodeIfPresent(originValue, forKey: .origin)
         try c.encodeIfPresent(scaleValue, forKey: .scale)
