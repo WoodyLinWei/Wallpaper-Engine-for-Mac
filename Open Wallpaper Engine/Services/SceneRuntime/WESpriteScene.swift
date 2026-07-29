@@ -48,7 +48,18 @@ final class WESpriteScene: SKScene {
         }
     }
 
+    private final class MotionItemBinding {
+        weak var node: SKSpriteNode?
+        let controller: MotionItemController
+
+        init(node: SKSpriteNode, controller: MotionItemController) {
+            self.node = node
+            self.controller = controller
+        }
+    }
+
     private var mobBindings: [MobBinding] = []
+    private var motionItemBindings: [MotionItemBinding] = []
     private var timedAnimations: [TimedAnimationBinding] = []
     private var lastUpdateTime: TimeInterval?
 
@@ -150,6 +161,12 @@ final class WESpriteScene: SKScene {
         node.texture = textures[0]
     }
 
+    func bindMotionItem(node: SKSpriteNode, controller: MotionItemController) {
+        let binding = MotionItemBinding(node: node, controller: controller)
+        motionItemBindings.append(binding)
+        apply(controller.position, to: binding)
+    }
+
     override func update(_ currentTime: TimeInterval) {
         defer { lastUpdateTime = currentTime }
         guard let lastUpdateTime else { return }
@@ -161,6 +178,13 @@ final class WESpriteScene: SKScene {
             guard binding.node != nil else { return true }
             let state = binding.controller.update(deltaTime: deltaTime)
             apply(state, to: binding)
+            return false
+        }
+
+        motionItemBindings.removeAll { binding in
+            guard binding.node != nil else { return true }
+            let position = binding.controller.update(deltaTime: deltaTime)
+            apply(position, to: binding)
             return false
         }
 
@@ -188,5 +212,9 @@ final class WESpriteScene: SKScene {
         guard !binding.textures.isEmpty else { return }
         let frameIndex = min(max(state.frame, 0), binding.textures.count - 1)
         node.texture = binding.textures[frameIndex]
+    }
+
+    private func apply(_ position: MotionItemPosition, to binding: MotionItemBinding) {
+        binding.node?.position = CGPoint(x: position.x, y: position.y)
     }
 }

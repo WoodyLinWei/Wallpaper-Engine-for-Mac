@@ -287,6 +287,40 @@ if let wallpaperPath = ProcessInfo.processInfo.environment["WE_MAPLE_WALLPAPER"]
     }
 }
 
+if let wallpaperPath = ProcessInfo.processInfo.environment["WE_HAPPYVILLE_WALLPAPER"] {
+    do {
+        let wallpaperURL = URL(fileURLWithPath: wallpaperPath, isDirectory: true)
+        let projectData = try Data(contentsOf: wallpaperURL.appendingPathComponent("project.json"))
+        let project = try JSONSerialization.jsonObject(with: projectData) as? [String: Any]
+        expectEqual(
+            project?["title"] as? String,
+            "MapleStory: Happyville<White Christmas> 冒险岛：幸福村",
+            "Happyville fixture title matches the selected wallpaper"
+        )
+
+        let package = try PKGParser(url: wallpaperURL.appendingPathComponent("scene.pkg"))
+        guard let targetScene = try package.extractJSON(named: "scene.json", as: WEScene.self) else {
+            throw NSError(domain: "SceneRuntimeTests", code: 4)
+        }
+        let motionConfigurations = targetScene.objects.compactMap { object in
+            object.originScript.flatMap(MotionItemScriptParser.parse)
+        }
+        expectEqual(motionConfigurations.count, 2, "Happyville discovers two moving sleigh layers")
+        expect(
+            motionConfigurations.allSatisfy {
+                $0.axis == .x &&
+                $0.direction == -1 &&
+                $0.speed == 2 &&
+                $0.randomRange == 570...750
+            },
+            "Happyville sleigh layers preserve their authored motion settings"
+        )
+    } catch {
+        failures += 1
+        print("FAIL: Happyville fixture validation threw \(error)")
+    }
+}
+
 let snailScript =
     """
     'use strict';
@@ -339,7 +373,7 @@ expectEqual(
     "Mob parser rejects empty animation lists"
 )
 
-private final class SequenceRandomSource: MobRandomSource {
+private final class SequenceRandomSource: MobRandomSource, MotionItemRandomSource {
     private let values: [Double]
     private var index = 0
 
@@ -353,6 +387,63 @@ private final class SequenceRandomSource: MobRandomSource {
         return values[index % values.count]
     }
 }
+
+let sleighScript =
+    """
+    let item
+    export function update(value) {
+        item.motion(value)
+        return value;
+    }
+    export function init(value) {
+        item = new shared.MotionItem(thisLayer, 2, 'x-', [570, 750])
+        return value;
+    }
+    """
+
+if let sleigh = MotionItemScriptParser.parse(sleighScript) {
+    expectEqual(sleigh.axis, .x, "MotionItem parser reads the horizontal axis")
+    expectEqual(sleigh.direction, -1, "MotionItem parser reads leftward direction")
+    expectEqual(sleigh.speed, 2, "MotionItem parser reads source speed")
+    expectEqual(sleigh.randomRange, 570...750, "MotionItem parser reads vertical reset range")
+} else {
+    failures += 1
+    print("FAIL: MotionItem parser rejected the Happyville sleigh script")
+}
+
+expectEqual(
+    MotionItemScriptParser.parse("return value;"),
+    nil,
+    "non-MotionItem script is ignored"
+)
+
+let sleighConfiguration = MotionItemBehaviorConfiguration(
+    axis: .x,
+    direction: -1,
+    speed: 2,
+    randomRange: 570...750
+)
+let sleighController = MotionItemController(
+    configuration: sleighConfiguration,
+    canvasSize: MotionItemSize(width: 2580, height: 1080),
+    itemSize: MotionItemSize(width: 145, height: 52),
+    initialPosition: MotionItemPosition(x: 1250, y: 570),
+    randomSource: SequenceRandomSource([0.5])
+)
+let movedSleigh = sleighController.update(deltaTime: 1)
+expectEqual(movedSleigh.x, 1190, "MotionItem speed matches the source's 30 Hz time base")
+expectEqual(movedSleigh.y, 570, "horizontal MotionItem preserves Y until reset")
+
+let wrappingSleigh = MotionItemController(
+    configuration: sleighConfiguration,
+    canvasSize: MotionItemSize(width: 2580, height: 1080),
+    itemSize: MotionItemSize(width: 145, height: 52),
+    initialPosition: MotionItemPosition(x: -71, y: 570),
+    randomSource: SequenceRandomSource([0.5])
+)
+let wrappedSleigh = wrappingSleigh.update(deltaTime: 1.0 / 30.0)
+expectEqual(wrappedSleigh.x, 2652.5, "left-moving MotionItem restarts beyond the right edge")
+expectEqual(wrappedSleigh.y, 660, "MotionItem randomizes its perpendicular reset position")
 
 let movementConfiguration = MobBehaviorConfiguration(
     lowerBound: 10,

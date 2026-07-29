@@ -110,6 +110,7 @@ class SceneWallpaperViewModel: ObservableObject {
         var hasImage = false
         var animatedLayerCount = 0
         var mobLayerCount = 0
+        var motionItemLayerCount = 0
         var scrollLayerCount = 0
 
         for (index, obj) in scene.objects.enumerated() {
@@ -126,19 +127,40 @@ class SceneWallpaperViewModel: ObservableObject {
                 skScene.addChild(node)
                 hasImage = true
 
-                if
-                    let script = obj.originScript,
-                    let configuration = MobScriptParser.parse(script)
-                {
-                    let controller = MobController(configuration: configuration)
-                    skScene.bindMob(
-                        node: node,
-                        textures: built.frameTextures,
-                        controller: controller,
-                        baseScale: node.xScale
-                    )
-                    mobLayerCount += 1
-                } else if built.frameTextures.count > 1 {
+                var mobControlsFrames = false
+                if let script = obj.originScript {
+                    if let configuration = MobScriptParser.parse(script) {
+                        let controller = MobController(configuration: configuration)
+                        skScene.bindMob(
+                            node: node,
+                            textures: built.frameTextures,
+                            controller: controller,
+                            baseScale: node.xScale
+                        )
+                        mobLayerCount += 1
+                        mobControlsFrames = true
+                    } else if let configuration = MotionItemScriptParser.parse(script) {
+                        let controller = MotionItemController(
+                            configuration: configuration,
+                            canvasSize: MotionItemSize(
+                                width: skScene.size.width,
+                                height: skScene.size.height
+                            ),
+                            itemSize: MotionItemSize(
+                                width: node.size.width,
+                                height: node.size.height
+                            ),
+                            initialPosition: MotionItemPosition(
+                                x: node.position.x,
+                                y: node.position.y
+                            )
+                        )
+                        skScene.bindMotionItem(node: node, controller: controller)
+                        motionItemLayerCount += 1
+                    }
+                }
+
+                if !mobControlsFrames && built.frameTextures.count > 1 {
                     skScene.bindTimedAnimation(
                         node: node,
                         textures: built.frameTextures,
@@ -165,7 +187,8 @@ class SceneWallpaperViewModel: ObservableObject {
         }
 
         Self.log(
-            "Runtime bindings: mobs=\(mobLayerCount) timedAnimations=\(animatedLayerCount) scrolls=\(scrollLayerCount)"
+            "Runtime bindings: mobs=\(mobLayerCount) motionItems=\(motionItemLayerCount) " +
+            "timedAnimations=\(animatedLayerCount) scrolls=\(scrollLayerCount)"
         )
         return skScene
     }

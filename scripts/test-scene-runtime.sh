@@ -15,6 +15,7 @@ env DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
     "$repo_root/Open Wallpaper Engine/Services/SceneParsers/PKGParser.swift" \
     "$repo_root/Open Wallpaper Engine/Services/SceneParsers/TEXParser.swift" \
     "$repo_root/Open Wallpaper Engine/Services/SceneRuntime/MobBehavior.swift" \
+    "$repo_root/Open Wallpaper Engine/Services/SceneRuntime/MotionItemBehavior.swift" \
     "$repo_root/Open Wallpaper Engine/Services/SceneRuntime/WESpriteScene.swift" \
     "$repo_root/Open Wallpaper Engine/Services/SceneRuntime/SceneAudioController.swift" \
     "$repo_root/Tests/SceneRuntimeTests/main.swift" \
