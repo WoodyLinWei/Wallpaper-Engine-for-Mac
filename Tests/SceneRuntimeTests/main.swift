@@ -270,6 +270,121 @@ if let wallpaperPath = ProcessInfo.processInfo.environment["WE_MAPLE_WALLPAPER"]
     }
 }
 
+let snailScript =
+    """
+    'use strict';
+    export function init(value) {
+        mob = new shared.Mob({
+            range: [132, 1786],
+            moveList: [0, 0.0, 0, 1, 1, 2, 3,],
+            standList: [0],
+            speed: 1,
+        })
+        return value;
+    }
+    """
+
+let slimeScript =
+    """
+    mob = new shared.Mob({
+        range: [400, 1515],
+        moveList: [3, 3, 4, 4, 5, 6, 7, 8, 9, 10],
+        standList: [0, 0, 1, 1, 2, 2],
+        speed: 2.2
+    })
+    """
+
+if let snail = MobScriptParser.parse(snailScript) {
+    expectEqual(snail.lowerBound, 132, "Mob parser reads lower range")
+    expectEqual(snail.upperBound, 1786, "Mob parser reads upper range")
+    expectEqual(snail.moveFrames, [0, 0, 0, 1, 1, 2, 3], "Mob parser normalizes frame numbers")
+    expectEqual(snail.standFrames, [0], "Mob parser reads stand frames")
+    expectEqual(snail.speed, 1, "Mob parser reads integer speed")
+} else {
+    failures += 1
+    print("FAIL: Mob parser rejected the snail script")
+}
+
+if let slime = MobScriptParser.parse(slimeScript) {
+    expectEqual(slime.lowerBound, 400, "Mob parser reads second lower range")
+    expectEqual(slime.upperBound, 1515, "Mob parser reads second upper range")
+    expectEqual(slime.speed, 2.2, "Mob parser reads decimal speed")
+    expectEqual(slime.moveFrames.last, 10, "Mob parser reads longer move sequence")
+} else {
+    failures += 1
+    print("FAIL: Mob parser rejected the slime script")
+}
+
+expectEqual(MobScriptParser.parse("return value;"), nil, "non-Mob script is ignored")
+expectEqual(
+    MobScriptParser.parse("new shared.Mob({ range: [0, 1], moveList: [], standList: [] })"),
+    nil,
+    "Mob parser rejects empty animation lists"
+)
+
+private final class SequenceRandomSource: MobRandomSource {
+    private let values: [Double]
+    private var index = 0
+
+    init(_ values: [Double]) {
+        self.values = values
+    }
+
+    func nextUnit() -> Double {
+        guard !values.isEmpty else { return 0.5 }
+        defer { index += 1 }
+        return values[index % values.count]
+    }
+}
+
+let movementConfiguration = MobBehaviorConfiguration(
+    lowerBound: 10,
+    upperBound: 12,
+    moveFrames: [0, 1],
+    standFrames: [2],
+    speed: 1,
+    jumpFrame: nil
+)
+
+let movingController = MobController(
+    configuration: movementConfiguration,
+    randomSource: SequenceRandomSource([0, 0.9, 0.9, 0.9]),
+    initialX: 11,
+    initialDirection: 1,
+    initiallyMoving: true
+)
+expect(
+    (1...4).contains(movingController.state.remainingStateTime),
+    "Mob state duration starts between one and four seconds"
+)
+let firstMove = movingController.update(deltaTime: 1.0 / 30.0)
+expectEqual(firstMove.x, 10, "moving Mob advances at source speed")
+expectEqual(firstMove.frame, 0, "moving Mob advances move frame list")
+let boundaryMove = movingController.update(deltaTime: 1.0 / 30.0)
+expectEqual(boundaryMove.direction, -1, "Mob reverses source direction at lower bound")
+expectEqual(boundaryMove.x, 11, "Mob remains inside its movement range")
+expectEqual(boundaryMove.frame, 1, "moving Mob cycles to next frame")
+
+_ = movingController.update(deltaTime: 28.0 / 30.0)
+expectEqual(movingController.state.activity, .standing, "Mob switches from moving to standing")
+let beforeStandX = movingController.state.x
+let standing = movingController.update(deltaTime: 1.0 / 30.0)
+expectEqual(standing.x, beforeStandX, "standing Mob does not change X")
+expectEqual(standing.frame, 2, "standing Mob uses stand frame list")
+
+let randomizedController = MobController(
+    configuration: movementConfiguration,
+    randomSource: SequenceRandomSource([0.9, 0.9, 0.5, 0]),
+    initialX: nil,
+    initialDirection: nil,
+    initiallyMoving: nil
+)
+expect(
+    (movementConfiguration.lowerBound...movementConfiguration.upperBound)
+        .contains(randomizedController.state.x),
+    "random Mob initialization remains inside range"
+)
+
 if failures > 0 {
     print("\n\(failures) test(s) failed")
     exit(1)
