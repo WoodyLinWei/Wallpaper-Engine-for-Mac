@@ -471,6 +471,99 @@ if let wallpaperPath = ProcessInfo.processInfo.environment["WE_TOY_TOWER_WALLPAP
     }
 }
 
+if let wallpaperPath = ProcessInfo.processInfo.environment["WE_LITH_HARBOR_WALLPAPER"] {
+    do {
+        let wallpaperURL = URL(fileURLWithPath: wallpaperPath, isDirectory: true)
+        let projectData = try Data(
+            contentsOf: wallpaperURL.appendingPathComponent("project.json")
+        )
+        let project = try JSONSerialization.jsonObject(with: projectData)
+            as? [String: Any]
+        expectEqual(
+            project?["title"] as? String,
+            "MapleStory:  Lith Harbor 冒险岛：明珠港",
+            "Lith Harbor fixture title matches the selected wallpaper"
+        )
+
+        let package = try PKGParser(
+            url: wallpaperURL.appendingPathComponent("scene.pkg")
+        )
+        guard let targetScene = try package.extractJSON(
+            named: "scene.json",
+            as: WEScene.self
+        ) else {
+            throw NSError(domain: "SceneRuntimeTests", code: 6)
+        }
+
+        let allPropertyScripts = targetScene.objects.flatMap { object in
+            [
+                object.originScript,
+                object.scaleScript,
+                object.visibleScript,
+                object.alphaScript
+            ].compactMap { $0 }
+        }
+        let constants = SceneScriptConstantsParser.parse(allPropertyScripts)
+        expectEqual(constants["speed"], 0.5, "Lith Harbor discovers its shared scene speed")
+
+        let configurations = targetScene.objects.compactMap { object in
+            object.originScript.flatMap {
+                ScriptedOriginMotionParser.parse($0, constants: constants)
+            }
+        }
+        expectEqual(
+            configurations.count,
+            16,
+            "Lith Harbor discovers all moving cloud layers"
+        )
+        expect(
+            configurations.allSatisfy { $0.wrapBoundary != nil },
+            "every Lith Harbor cloud layer preserves its wrap boundary"
+        )
+
+        var paddedStaticTextureCount = 0
+        for object in targetScene.objects {
+            guard
+                let modelPath = object.image,
+                let model = try package.extractJSON(
+                    named: modelPath,
+                    as: WEModel.self
+                ),
+                let materialPath = model.material,
+                let material = try package.extractJSON(
+                    named: materialPath,
+                    as: WEMaterial.self
+                ),
+                let textureName = material.passes?.first?.textures?.first
+            else {
+                continue
+            }
+
+            let materialDirectory =
+                (materialPath as NSString).deletingLastPathComponent
+            let texturePath = "\(materialDirectory)/\(textureName).tex"
+            guard
+                let textureData = package.extractFile(named: texturePath),
+                let decoded = try? TEXParser(data: textureData).decodeTexture(),
+                decoded.frames.isEmpty,
+                decoded.metadata.width != decoded.metadata.textureWidth ||
+                    decoded.metadata.height != decoded.metadata.textureHeight
+            else {
+                continue
+            }
+            paddedStaticTextureCount += 1
+        }
+        expectEqual(
+            paddedStaticTextureCount,
+            5,
+            "Lith Harbor discovers every padded static texture"
+        )
+    } catch {
+        failures += 1
+        print("FAIL: Lith Harbor fixture validation threw \(error)")
+    }
+}
+
 let laterParentRecords = [
     SceneHierarchyRecord(id: 198, parentID: 170, sourceIndex: 0),
     SceneHierarchyRecord(id: 170, parentID: nil, sourceIndex: 1)
@@ -803,6 +896,64 @@ expectEqual(
     ScriptedOriginMotionParser.parse("return value", constants: sharedConstants),
     nil,
     "unsupported origin scripts remain inert"
+)
+
+let lithHarborConstants = ["speed": 0.5]
+let lithHarborCloudScript =
+    """
+    export function update(value) {
+        value.x -= shared.speed
+        if (value.x <= -200) {
+            value.x = 2125
+        }
+        return value
+    }
+    """
+
+let lithHarborCloudConfiguration = ScriptedOriginMotionParser.parse(
+    lithHarborCloudScript,
+    constants: lithHarborConstants
+)
+if let lithHarborCloudConfiguration {
+    expectNear(
+        lithHarborCloudConfiguration.horizontalStep,
+        -0.5,
+        "implicit shared speed uses a multiplier of one"
+    )
+    expectEqual(
+        lithHarborCloudConfiguration.wrapBoundary,
+        .lessThanOrEqual(-200),
+        "cloud parser preserves an inclusive left wrap boundary"
+    )
+
+    let inclusiveCloud = ScriptedOriginMotionController(
+        configuration: lithHarborCloudConfiguration,
+        initialPosition: MotionItemPosition(x: -199.5, y: 980)
+    )
+    let inclusiveWrap = inclusiveCloud.update(deltaTime: 1.0 / 30.0)
+    expectNear(inclusiveWrap.x, 2125, "cloud wraps when X equals its inclusive boundary")
+} else {
+    failures += 1
+    print("FAIL: scripted origin parser rejected the Lith Harbor cloud")
+}
+
+let inclusiveRightScript =
+    """
+    export function update(value) {
+        value.x += shared.speed
+        if (value.x >= 200) {
+            value.x = -10
+        }
+        return value
+    }
+    """
+expectEqual(
+    ScriptedOriginMotionParser.parse(
+        inclusiveRightScript,
+        constants: lithHarborConstants
+    )?.wrapBoundary,
+    .greaterThanOrEqual(200),
+    "cloud parser preserves an inclusive right wrap boundary"
 )
 
 if let cloudConfiguration = ScriptedOriginMotionParser.parse(

@@ -10,7 +10,9 @@ import Foundation
 
 enum ScriptedOriginWrapBoundary: Equatable {
     case lessThan(Double)
+    case lessThanOrEqual(Double)
     case greaterThan(Double)
+    case greaterThanOrEqual(Double)
 }
 
 struct ScriptedOriginVerticalOscillation: Equatable {
@@ -112,8 +114,8 @@ enum ScriptedOriginMotionParser {
         constants: [String: Double]
     ) -> [Double] {
         let pattern =
-            #"value\.x\s*(?:=\s*value\.x\s*([+-])|([+-])=)\s*(?:shared\.([A-Za-z_]\w*)\s*\*\s*)?("#
-            + number + #")"#
+            #"value\.x\s*(?:=\s*value\.x\s*([+-])|([+-])=)\s*(?:shared\.([A-Za-z_]\w*)(?:\s*\*\s*("#
+            + number + #"))?|("# + number + #"))"#
         guard let expression = try? NSRegularExpression(pattern: pattern) else {
             return []
         }
@@ -122,20 +124,22 @@ enum ScriptedOriginMotionParser {
         return expression.matches(in: script, range: range).compactMap { match in
             let operatorText = captureString(match, group: 1, in: script)
                 ?? captureString(match, group: 2, in: script)
-            guard
-                let operatorText,
-                let magnitude = captureDouble(match, group: 4, in: script)
-            else {
+            guard let operatorText else {
                 return nil
             }
 
-            var multiplier = 1.0
+            let magnitude: Double
             if let constantName = captureString(match, group: 3, in: script) {
                 guard let constant = constants[constantName] else { return nil }
-                multiplier = constant
+                let factor = captureDouble(match, group: 4, in: script) ?? 1
+                magnitude = constant * factor
+            } else if let literal = captureDouble(match, group: 5, in: script) {
+                magnitude = literal
+            } else {
+                return nil
             }
             let sign = operatorText == "-" ? -1.0 : 1.0
-            let result = sign * magnitude * multiplier
+            let result = sign * magnitude
             return result.isFinite ? result : nil
         }
     }
@@ -144,7 +148,7 @@ enum ScriptedOriginMotionParser {
         in script: String
     ) -> (boundary: ScriptedOriginWrapBoundary?, restartX: Double?) {
         let pattern =
-            #"if\s*\(\s*value\.x\s*([<>])\s*("# + number
+            #"if\s*\(\s*value\.x\s*([<>]=?)\s*("# + number
             + #")\s*\)\s*\{\s*value\.x\s*=\s*("# + number + #")"#
         guard
             let match = firstMatch(pattern, in: script),
@@ -155,8 +159,19 @@ enum ScriptedOriginMotionParser {
             return (nil, nil)
         }
 
-        let boundary: ScriptedOriginWrapBoundary =
-            comparison == "<" ? .lessThan(threshold) : .greaterThan(threshold)
+        let boundary: ScriptedOriginWrapBoundary
+        switch comparison {
+        case "<":
+            boundary = .lessThan(threshold)
+        case "<=":
+            boundary = .lessThanOrEqual(threshold)
+        case ">":
+            boundary = .greaterThan(threshold)
+        case ">=":
+            boundary = .greaterThanOrEqual(threshold)
+        default:
+            return (nil, nil)
+        }
         return (boundary, restartX)
     }
 
@@ -299,8 +314,12 @@ final class ScriptedOriginMotionController {
         switch configuration.wrapBoundary {
         case .lessThan(let boundary):
             return position.x < boundary
+        case .lessThanOrEqual(let boundary):
+            return position.x <= boundary
         case .greaterThan(let boundary):
             return position.x > boundary
+        case .greaterThanOrEqual(let boundary):
+            return position.x >= boundary
         case nil:
             return false
         }
