@@ -61,13 +61,8 @@ let paddedTextureMetadata = TEXMetadata(
 )
 expectEqual(
     paddedTextureMetadata.normalizedContentRect,
-    CGRect(
-        x: 0,
-        y: 0.47265625,
-        width: 0.9375,
-        height: 0.52734375
-    ),
-    "static TEX samples only its top-left logical content"
+    CGRect(x: 0, y: 0, width: 1, height: 1),
+    "static TEX preserves the complete atlas when logical dimensions are smaller"
 )
 
 let exactTextureMetadata = TEXMetadata(

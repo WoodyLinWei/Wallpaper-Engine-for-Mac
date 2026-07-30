@@ -19,25 +19,11 @@ struct TEXMetadata: Equatable {
     let textureHeight: UInt32
 
     var normalizedContentRect: CGRect {
-        guard
-            width > 0,
-            height > 0,
-            textureWidth > 0,
-            textureHeight > 0,
-            width <= textureWidth,
-            height <= textureHeight
-        else {
-            return CGRect(x: 0, y: 0, width: 1, height: 1)
-        }
-
-        let normalizedWidth = Double(width) / Double(textureWidth)
-        let normalizedHeight = Double(height) / Double(textureHeight)
-        return CGRect(
-            x: 0,
-            y: 1 - normalizedHeight,
-            width: normalizedWidth,
-            height: normalizedHeight
-        )
+        // Static Wallpaper Engine TEX files can use their logical dimensions
+        // as the rendered object size while the complete storage atlas still
+        // contains authored scene pixels. Cropping to width/height removes
+        // real map content and breaks alignment with separately placed nodes.
+        CGRect(x: 0, y: 0, width: 1, height: 1)
     }
 }
 
