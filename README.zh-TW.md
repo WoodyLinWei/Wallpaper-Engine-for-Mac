@@ -9,6 +9,16 @@ Open Wallpaper Engine（修補版）
 
 > **注意：** 本專案與 Steam 上的商業版 Wallpaper Engine 無關。這是一個開源的 macOS 應用程式，可顯示來自 Wallpaper Engine Steam 創意工坊的桌布素材。
 
+## 下載（不需要 Xcode）
+
+- **建議：** [前往最新版 Release 下載 Universal ZIP](https://github.com/WoodyLinWei/Wallpaper-Engine-for-Mac/releases/latest)
+- **備用：** [直接下載儲存庫內的 Universal ZIP](https://github.com/WoodyLinWei/Wallpaper-Engine-for-Mac/raw/main/dist/Open-Wallpaper-Engine-Mac-Universal.zip)
+- 支援 Apple Silicon（M 系列）與 Intel Mac，系統需求為 macOS 13 或以上。
+
+解壓縮後把 **Open Wallpaper Engine.app** 拖進「應用程式」。本 App 尚未使用 Apple Developer ID 簽署與公證；第一次開啟請在 App 上按右鍵選「打開」。若仍被阻擋，請至「系統設定 → 隱私權與安全性」按「仍要打開」。不需要也不建議停用整台 Mac 的 Gatekeeper。
+
+更完整的安裝說明請見 [DOWNLOAD.md](DOWNLOAD.md)。
+
 ## 相關專案
 
 - **[Open Wallpaper Engine for Linux](https://github.com/Unayung/simple-linux-wallpaperengine-gui)** — 基於 [linux-wallpaperengine](https://github.com/Almamu/linux-wallpaperengine) 的 PyQt6 圖形介面，Steam 工作坊整合與 UI 設計移植自本 macOS 版本。
@@ -22,6 +32,7 @@ Open Wallpaper Engine（修補版）
 - **[1ris_W](https://github.com/Erica-Iris)** — 中文 i18n 翻譯
 - **[Klaus Zhu](https://github.com/klauszhu1105)** — 應用程式圖示
 - **[Chen Chia Yang](https://github.com/Unayung)** — 場景桌布渲染、網頁桌布修復、Steam 創意工坊整合、多螢幕支援、Zip 匯入
+- **[WoodyLinWei](https://github.com/WoodyLinWei)** — macOS 場景執行階段、動畫／音訊相容性、多螢幕音訊修正與 Universal 發行版
 
 採用 [GPL-3.0](LICENSE) 授權，與原始專案相同。
 
@@ -73,9 +84,12 @@ Cmd+點擊選取多個桌布，右鍵選擇批次取消訂閱。
 
 **新實作包括：**
 - **PKG 解析器** — 讀取 Wallpaper Engine 的 PKGV 封存格式，提取 scene.json、模型、材質和紋理
-- **TEX 解析器** — 讀取 TEXV0005 紋理容器，從 TEXI/TEXB 區段提取嵌入的 JPEG/PNG 圖片
+- **TEX 解析器** — 讀取 TEXV0005、LZ4 壓縮及 TEXS 動畫紋理，提取可由 macOS 顯示的影格
 - **Scene JSON 解碼器** — 解析 scene.json，靈活處理多態欄位（值可為純類型或 `{"script":..,"value":..}` 物件）
 - **SpriteKit 渲染器** — 將場景圖層渲染為 SKSpriteNode，正確處理定位、尺寸、透明度、色彩調整和混合模式
+- **場景動畫** — 支援 TEXS 定時影格、常見腳本移動、捲動及上下漂浮；可讓角色、怪物、雲層與飛行物件恢復動態
+- **場景音訊** — 播放桌布隨附音樂並遵守播放／暫停／靜音設定；多螢幕使用相同桌布時只保留一組音訊
+- **圖層階層** — 支援父子節點、圖層順序與統一場景座標轉換，改善寬螢幕下物件與平台對位
 - **預覽回退** — 無法提取紋理時回退至 preview.jpg/png/gif
 - **TEXI 格式偵測** — 快速識別並跳過無法解碼的 DXT 壓縮紋理
 
@@ -85,11 +99,12 @@ Cmd+點擊選取多個桌布，右鍵選擇批次取消訂閱。
 ## 目前限制
 
 - **DXT 紋理** — 使用 DXT1/DXT5 壓縮紋理（TEXI 格式 4/7/8）的桌布無法渲染。這些是需要軟體解壓縮器或 Metal 渲染的 GPU 原生壓縮格式。此類桌布會回退至預覽圖。
-- **粒子效果** — 場景粒子系統（雨、雪、閃光）已解析但在渲染中停用，以避免視覺問題。
-- **音訊互動腳本** — Wallpaper Engine 基於 JavaScript 的音訊視覺化腳本不會執行。帶腳本的屬性回退至靜態 `value`。
+- **粒子效果** — 場景粒子系統僅部分支援；不安全或效果不正確的粒子會停用。
+- **任意 SceneScript** — 基於安全考量不執行任意 JavaScript，只相容已知且可安全重現的常見移動模式。
+- **音訊互動腳本** — 桌布隨附音樂可播放，但基於 JavaScript 的音訊視覺化不支援。
 - **著色器效果** — 自定義 GLSL 著色器（泛光、模糊、色彩校正）未套用。
 - **相機視差** — 滑鼠追蹤相機移動未實作。
-- **動畫場景** — 精靈動畫和基於時間軸的物件動畫不支援。
+- **複雜時間軸** — TEXS 精靈動畫與常見移動已支援，但作者自訂的複雜時間軸或專用腳本仍可能與 Windows 版不同。
 - **部分 JPEG 縮圖** — 少數 TEXB 格式 1 檔案包含 macOS 無法解碼的非標準 JPEG 資料。
 
 ## 支援的桌布類型
@@ -99,6 +114,9 @@ Cmd+點擊選取多個桌布，右鍵選擇批次取消訂閱。
 | 影片 (.mp4, .webm) | 正常運作（原始） |
 | 網頁 (HTML/WebGL) | 正常運作（已修補） |
 | 場景（靜態圖片） | 正常運作（新功能） |
+| 場景（TEXS 影格動畫） | 正常運作 |
+| 場景（常見腳本移動） | 部分支援 |
+| 場景（隨附音訊） | 正常運作 |
 | 場景（粒子） | 部分支援（已停用） |
 | 場景（DXT 紋理） | 預覽回退 |
 | 應用程式 | 不支援 |
@@ -112,8 +130,8 @@ Cmd+點擊選取多個桌布，右鍵選擇批次取消訂閱。
 
 ### 步驟
 ```sh
-git clone https://github.com/unayung/wallpaper-engine-mac
-cd wallpaper-engine-mac
+git clone https://github.com/WoodyLinWei/Wallpaper-Engine-for-Mac.git
+cd Wallpaper-Engine-for-Mac
 open "Open Wallpaper Engine.xcodeproj"
 ```
 
@@ -133,6 +151,13 @@ open "Open Wallpaper Engine.xcodeproj"
 - **資料夾：** 檔案 > 從資料夾匯入——選擇包含 `project.json` 的桌布資料夾
 - **Zip：** 檔案 > 匯入 或拖放包含桌布套件的 `.zip` 檔案
 - **手動：** 直接將桌布資料夾複製到 `~/Documents/Open Wallpaper Engine/`
+
+## 常見問題
+
+- **Apple 顯示「無法驗證」怎麼辦？** 請依上方下載區的右鍵「打開」或「隱私權與安全性 → 仍要打開」操作，不要全域停用 Gatekeeper。
+- **為什麼和 Windows Wallpaper Engine 不完全一樣？** 本專案是獨立的相容實作，不含原版引擎；自訂著色器、任意腳本與部分粒子仍可能不同。
+- **雙螢幕會播放兩份音樂嗎？** 相同桌布在多個螢幕顯示時會共用音訊所有權，避免疊加播放。
+- **如何回報問題？** 請附桌布名稱、螢幕解析度、macOS 與 App 版本及畫面截圖；請勿上傳 Steam 密碼、API 金鑰、Cookie 或未授權的桌布素材。
 
 ## 變更的檔案（相對上游）
 

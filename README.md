@@ -9,6 +9,13 @@ A patched fork of [Open Wallpaper Engine](https://github.com/MrWindDog/wallpaper
 
 > **Note:** This is NOT affiliated with the commercial Wallpaper Engine on Steam. This is an open-source macOS app that can display wallpaper assets from Wallpaper Engine's Steam Workshop.
 
+## Download (No Xcode Required)
+
+- [Download the latest Universal ZIP from Releases](https://github.com/WoodyLinWei/Wallpaper-Engine-for-Mac/releases/latest)
+- [Fallback direct ZIP download](https://github.com/WoodyLinWei/Wallpaper-Engine-for-Mac/raw/main/dist/Open-Wallpaper-Engine-Mac-Universal.zip)
+
+Supports Apple Silicon and Intel Macs on macOS 13 or later. The app is not Apple-notarized; right-click the app and choose **Open**, or allow it from **System Settings → Privacy & Security**. Do not disable Gatekeeper globally.
+
 ## Related Projects
 
 - **[Open Wallpaper Engine for Linux](https://github.com/Unayung/simple-linux-wallpaperengine-gui)** — A PyQt6 GUI for [linux-wallpaperengine](https://github.com/Almamu/linux-wallpaperengine), with Steam Workshop integration and UI design ported from this macOS version.
@@ -22,6 +29,7 @@ This project is built on top of the work of:
 - **[1ris_W](https://github.com/Erica-Iris)** — Chinese i18n translation
 - **[Klaus Zhu](https://github.com/klauszhu1105)** — App logo icons
 - **[Chen Chia Yang](https://github.com/Unayung)** — Scene wallpaper rendering, web wallpaper fixes, Steam Workshop integration, multi-display support, zip import
+- **[WoodyLinWei](https://github.com/WoodyLinWei)** — Native scene runtime, animation/audio compatibility, multi-display audio fixes, and Universal releases
 
 Licensed under [GPL-3.0](LICENSE), same as the original project.
 
@@ -73,9 +81,11 @@ Scene wallpapers (the most common type on Steam Workshop) were completely unimpl
 
 **New implementation includes:**
 - **PKG parser** — Reads Wallpaper Engine's PKGV archive format to extract scene.json, models, materials, and textures
-- **TEX parser** — Reads TEXV0005 texture containers, extracts embedded JPEG/PNG image data from TEXI/TEXB sections
+- **TEX parser** — Reads TEXV0005, LZ4-compressed data, and TEXS animated textures
 - **Scene JSON decoder** — Parses scene.json with flexible decoding that handles Wallpaper Engine's polymorphic fields (values can be plain types or `{"script":..,"value":..}` objects)
 - **SpriteKit renderer** — Renders scene image layers as SKSpriteNodes with correct positioning, sizing, alpha, color tinting, and blend modes
+- **Scene animation and audio** — Supports TEXS frames, common scripted movement, scrolling/bobbing, packaged audio, playback controls, and multi-display audio deduplication
+- **Scene hierarchy** — Preserves parent transforms, layer order, and a unified scene coordinate system
 - **Preview fallback** — Falls back to preview.jpg/png/gif when textures can't be extracted
 - **TEXI format detection** — Quickly identifies and skips DXT-compressed textures that can't be decoded
 
@@ -85,11 +95,12 @@ The import panel now correctly handles both individual wallpaper folders and par
 ## Current Limitations
 
 - **DXT textures** — Wallpapers using DXT1/DXT5 compressed textures (TEXI format 4/7/8) cannot be rendered. These are GPU-native compressed formats that require either a software decompressor or Metal-based rendering. The app falls back to the preview image for these wallpapers.
-- **Particle effects** — Scene particle systems (rain, snow, sparkles) are parsed but disabled in rendering to avoid visual artifacts. The particle mapping code exists but needs refinement.
-- **Audio-reactive scripts** — Wallpaper Engine's JavaScript-based audio visualization scripts are not executed. Properties with scripts fall back to their static `value`.
+- **Particle effects** — Particle systems are only partially supported; unsafe or inaccurate effects remain disabled.
+- **Arbitrary SceneScript** — Arbitrary JavaScript is not executed. Only recognized, safely reproduced motion patterns are supported.
+- **Audio-reactive scripts** — Packaged scene audio works, but JavaScript audio visualization does not.
 - **Shader effects** — Custom GLSL shaders (bloom, blur, color correction) are not applied.
 - **Camera parallax** — Mouse-tracking camera movement is not implemented.
-- **Animated scenes** — Sprite animations and timeline-based object animations are not supported.
+- **Complex timelines** — TEXS animation and common motion work, but wallpaper-specific timelines or scripts may differ from Windows.
 - **Some JPEG thumbnails** — A small number of TEXB format 1 files contain non-standard JPEG data that macOS cannot decode. These are typically DXT-compressed textures misidentified as format 1.
 
 ## Supported Wallpaper Types
@@ -99,6 +110,9 @@ The import panel now correctly handles both individual wallpaper folders and par
 | Video (.mp4, .webm) | Working (original) |
 | Web (HTML/WebGL) | Working (patched) |
 | Scene (static images) | Working (new) |
+| Scene (TEXS frame animation) | Working |
+| Scene (common scripted motion) | Partial |
+| Scene (packaged audio) | Working |
 | Scene (particles) | Partial (disabled) |
 | Scene (DXT textures) | Preview fallback |
 | Application | Not supported |
@@ -112,8 +126,8 @@ The import panel now correctly handles both individual wallpaper folders and par
 
 ### Steps
 ```sh
-git clone https://github.com/unayung/wallpaper-engine-mac
-cd wallpaper-engine-mac
+git clone https://github.com/WoodyLinWei/Wallpaper-Engine-for-Mac.git
+cd Wallpaper-Engine-for-Mac
 open "Open Wallpaper Engine.xcodeproj"
 ```
 
