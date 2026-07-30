@@ -51,6 +51,67 @@ expectEqual(vector.0, 1, "test harness compiles production parsing code")
 expectEqual(vector.1, 2, "vector parser returns Y")
 expectEqual(vector.2, 3, "vector parser returns Z")
 
+let paddedTextureMetadata = TEXMetadata(
+    format: 0,
+    flags: 0,
+    width: 1920,
+    height: 1080,
+    textureWidth: 2048,
+    textureHeight: 2048
+)
+expectEqual(
+    paddedTextureMetadata.normalizedContentRect,
+    CGRect(
+        x: 0,
+        y: 0.47265625,
+        width: 0.9375,
+        height: 0.52734375
+    ),
+    "static TEX samples only its top-left logical content"
+)
+
+let exactTextureMetadata = TEXMetadata(
+    format: 0,
+    flags: 0,
+    width: 67,
+    height: 67,
+    textureWidth: 67,
+    textureHeight: 67
+)
+expectEqual(
+    exactTextureMetadata.normalizedContentRect,
+    CGRect(x: 0, y: 0, width: 1, height: 1),
+    "matching logical and storage dimensions use the complete texture"
+)
+
+let invalidTextureMetadata = TEXMetadata(
+    format: 0,
+    flags: 0,
+    width: 4096,
+    height: 1080,
+    textureWidth: 2048,
+    textureHeight: 2048
+)
+expectEqual(
+    invalidTextureMetadata.normalizedContentRect,
+    CGRect(x: 0, y: 0, width: 1, height: 1),
+    "oversized logical dimensions fall back to the complete texture"
+)
+
+let emptyTextureMetadata = TEXMetadata(
+    format: 0,
+    flags: 0,
+    width: 0,
+    height: 0,
+    textureWidth: 2048,
+    textureHeight: 2048
+)
+expectEqual(
+    emptyTextureMetadata.normalizedContentRect,
+    CGRect(x: 0, y: 0, width: 1, height: 1),
+    "empty logical dimensions fall back to the complete texture"
+)
+
 private func decodeObject(_ json: String) throws -> WESceneObject {
     try JSONDecoder().decode(WESceneObject.self, from: Data(json.utf8))
 }

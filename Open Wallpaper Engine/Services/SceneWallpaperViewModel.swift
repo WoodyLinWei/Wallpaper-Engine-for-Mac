@@ -316,7 +316,12 @@ class SceneWallpaperViewModel: ObservableObject {
 
         let frameTextures: [SKTexture]
         if decoded.frames.isEmpty {
-            frameTextures = [atlasTexture]
+            let texture = SKTexture(
+                rect: decoded.metadata.normalizedContentRect,
+                in: atlasTexture
+            )
+            texture.filteringMode = filteringMode
+            frameTextures = [texture]
         } else {
             frameTextures = decoded.frames.map { frame in
                 let rect = frame.normalizedRect(
