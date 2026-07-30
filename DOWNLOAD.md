@@ -3,7 +3,7 @@
 ## 下載
 
 - [最新版 GitHub Release（建議）](https://github.com/WoodyLinWei/Wallpaper-Engine-for-Mac/releases/latest)
-- [Universal ZIP 備用下載](https://github.com/WoodyLinWei/Wallpaper-Engine-for-Mac/raw/main/dist/Open-Wallpaper-Engine-Mac-Universal.zip)
+- [Universal ZIP 直接下載](https://github.com/WoodyLinWei/Wallpaper-Engine-for-Mac/releases/download/v0.8.1-scene-runtime.1/Open-Wallpaper-Engine-Mac-Universal.zip)
 
 此版本支援 Apple Silicon（M 系列）與 Intel Mac，需使用 macOS 13 或以上。
 

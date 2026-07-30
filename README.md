@@ -12,7 +12,7 @@ A patched fork of [Open Wallpaper Engine](https://github.com/MrWindDog/wallpaper
 ## Download (No Xcode Required)
 
 - [Download the latest Universal ZIP from Releases](https://github.com/WoodyLinWei/Wallpaper-Engine-for-Mac/releases/latest)
-- [Fallback direct ZIP download](https://github.com/WoodyLinWei/Wallpaper-Engine-for-Mac/raw/main/dist/Open-Wallpaper-Engine-Mac-Universal.zip)
+- [Direct Universal ZIP download](https://github.com/WoodyLinWei/Wallpaper-Engine-for-Mac/releases/download/v0.8.1-scene-runtime.1/Open-Wallpaper-Engine-Mac-Universal.zip)
 
 Supports Apple Silicon and Intel Macs on macOS 13 or later. The app is not Apple-notarized; right-click the app and choose **Open**, or allow it from **System Settings → Privacy & Security**. Do not disable Gatekeeper globally.
 

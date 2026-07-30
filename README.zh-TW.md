@@ -12,7 +12,7 @@ Open Wallpaper Engine（修補版）
 ## 下載（不需要 Xcode）
 
 - **建議：** [前往最新版 Release 下載 Universal ZIP](https://github.com/WoodyLinWei/Wallpaper-Engine-for-Mac/releases/latest)
-- **備用：** [直接下載儲存庫內的 Universal ZIP](https://github.com/WoodyLinWei/Wallpaper-Engine-for-Mac/raw/main/dist/Open-Wallpaper-Engine-Mac-Universal.zip)
+- **直接下載：** [Open-Wallpaper-Engine-Mac-Universal.zip](https://github.com/WoodyLinWei/Wallpaper-Engine-for-Mac/releases/download/v0.8.1-scene-runtime.1/Open-Wallpaper-Engine-Mac-Universal.zip)
 - 支援 Apple Silicon（M 系列）與 Intel Mac，系統需求為 macOS 13 或以上。
 
 解壓縮後把 **Open Wallpaper Engine.app** 拖進「應用程式」。本 App 尚未使用 Apple Developer ID 簽署與公證；第一次開啟請在 App 上按右鍵選「打開」。若仍被阻擋，請至「系統設定 → 隱私權與安全性」按「仍要打開」。不需要也不建議停用整台 Mac 的 Gatekeeper。
